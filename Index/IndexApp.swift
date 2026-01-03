@@ -1,6 +1,6 @@
 //
-//  DataInspectorApp.swift
-//  Data Inspector
+//  IndexApp.swift
+//  Index
 //
 //  Created by Axel Martinez on 12/12/24.
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct DataInspectorApp: App {
+struct IndexApp: App {
     @State var isFileDialogOpen = false
     @State var isSimulatorsDialogOpen = false
 

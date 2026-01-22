@@ -21,6 +21,7 @@ struct SimulatorsView: View {
     @State private var homeURL: URL?
     @State private var selectedSimulatorURL: URL?
     @State private var selectedFileInfo: FileInfo?
+    @State private var openAsReadOnly = false
     
     var userDirectory: URL? {
         if let userDirectory = FileManager.default.urls(for: .userDirectory, in: .localDomainMask).first {
@@ -60,7 +61,9 @@ struct SimulatorsView: View {
             if let selectedSimulatorURL {
                 SimulatorFilesView(
                     selectedFileInfo: $selectedFileInfo,
-                    openFile: openFile,
+                    openFile: { fileInfo, forceReadOnly in
+                        try await openFile(fileInfo: fileInfo, forceReadOnly: forceReadOnly)
+                    },
                     simulatorURL: selectedSimulatorURL
                 )
             } else {
@@ -71,13 +74,18 @@ struct SimulatorsView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Close") { self.dismiss() }
             }
-            
+
+            ToolbarItem(placement: .principal) {
+                Toggle("Open as Read-Only", isOn: $openAsReadOnly)
+                    .toggleStyle(.checkbox)
+            }
+
             ToolbarItem(placement: .confirmationAction) {
                 Button("Open") {
                     if let selectedFileInfo {
                         Task(priority: .userInitiated) {
                             do {
-                                try await self.openFile(fileInfo: selectedFileInfo)
+                                try await self.openFile(fileInfo: selectedFileInfo, forceReadOnly: openAsReadOnly)
                             } catch {
                                 fatalError(error.localizedDescription)
                             }
@@ -150,9 +158,9 @@ struct SimulatorsView: View {
         }
     }
     
-    func openFile(fileInfo: FileInfo) async throws {
-        try await self.sqlManager.connect(fileURL: fileInfo.url, appInfo: fileInfo.appInfo)
-        
+    func openFile(fileInfo: FileInfo, forceReadOnly: Bool = false) async throws {
+        try await self.sqlManager.connect(fileURL: fileInfo.url, appInfo: fileInfo.appInfo, forceReadOnly: forceReadOnly)
+
         self.dismiss()
     }
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		772B005F2F2127C800AA5FAD /* Index.icon in Resources */ = {isa = PBXBuildFile; fileRef = 772B005E2F2127C800AA5FAD /* Index.icon */; };
 		77443AF32CE4724700B11F4D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77443AF22CE4723200B11F4D /* ContentView.swift */; };
 		77443AFC2CE48EE500B11F4D /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77443AFB2CE48EE000B11F4D /* SidebarView.swift */; };
 		77443B532CE72BB000B11F4D /* SQLKit in Frameworks */ = {isa = PBXBuildFile; productRef = 77443B522CE72BB000B11F4D /* SQLKit */; };
@@ -44,6 +45,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		772B005E2F2127C800AA5FAD /* Index.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Index.icon; sourceTree = "<group>"; };
 		77443AF22CE4723200B11F4D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		77443AFB2CE48EE000B11F4D /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		77443B4A2CE72B9F00B11F4D /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
@@ -98,6 +100,7 @@
 		77443AF12CE4692100B11F4D /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				772B005E2F2127C800AA5FAD /* Index.icon */,
 				86DE4D0425ABAAAC00AEA5A5 /* Assets.xcassets */,
 				86DE4D0925ABAAAC00AEA5A5 /* Info.plist */,
 				86DE4D0A25ABAAAC00AEA5A5 /* Index.entitlements */,
@@ -304,6 +307,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				86DE4D0525ABAAAC00AEA5A5 /* Assets.xcassets in Resources */,
+				772B005F2F2127C800AA5FAD /* Index.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -481,7 +485,7 @@
 		86DE4D0E25ABAAAC00AEA5A5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Index;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "Index/Supporting Files/Index.entitlements";
@@ -513,7 +517,7 @@
 		86DE4D0F25ABAAAC00AEA5A5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Index;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "Index/Supporting Files/Index.entitlements";

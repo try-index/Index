@@ -23,11 +23,14 @@ class SQLiteManager: ObservableObject {
     @Published var openAppInfo: AppInfo?
     @Published var openAsSQLite = false
     @Published var displayMode: DisplayMode = .SQLite
+    @Published var isReadOnly = false
     
     var metadata : [String: Any]?
     var model: NSManagedObjectModel?
-    
     var connection: SQLiteConnection? = nil
+    
+    private var accessedFolderURL: URL?
+    
     var db: any SQLDatabase {
         get throws {
             if let connection = connection, !connection.isClosed {
@@ -39,41 +42,102 @@ class SQLiteManager: ObservableObject {
     }
     
     deinit {
-        try? self.closeConnection()
+        // Use the synchronous close via EventLoopFuture for deinit
+        try? self.connection?.close().wait()
+        
+        accessedFolderURL?.stopAccessingSecurityScopedResource()
     }
     
-    func connect(fileURL: URL, appInfo: AppInfo? = nil) async throws {
-        if self.connection != nil {
-            try closeConnection()
-        }
-        
-        self.connection = try await SQLiteConnectionSource(
-            configuration: .init(
-                storage: .file(path: fileURL.absoluteString)
-            ),
-            threadPool: .singleton
-        ).makeConnection(
-            logger: .init(label: "DataInspector"),
-            on: MultiThreadedEventLoopGroup.singleton.any()
-        ).get()
-        
-        if fileURL.pathExtension == "store" {
-            try await loadModelCacheAndMetadata(from: fileURL)
-        } else {
-            self.metadata = nil
-            self.model = nil
-        }
+    func setFolderAccess(_ folderURL: URL) {
+        // Stop previous folder access
+        accessedFolderURL?.stopAccessingSecurityScopedResource()
+        accessedFolderURL = folderURL
+    }
+    
+    func connect(fileURL: URL, appInfo: AppInfo? = nil, forceReadOnly: Bool = false) async throws {
+        var newConnection: SQLiteConnection
+        var openedAsReadOnly = false
 
-        try await setDisplayMode()
+        if forceReadOnly {
+            // User requested read-only mode
+            let fileURI = "file:\(fileURL.path)?immutable=1"
+
+            newConnection = try await SQLiteConnection.open(
+                storage: .file(path: fileURI)
+            )
+
+            _ = try await newConnection.query("PRAGMA quick_check")
+
+            openedAsReadOnly = true
+        } else {
+            // Try read-write mode first
+            do {
+                let rwConnection = try await SQLiteConnection.open(
+                    storage: .file(path: fileURL.path)
+                )
+
+                // Validate the connection and check for corruption
+                do {
+                    _ = try await rwConnection.query("PRAGMA quick_check")
+
+                    newConnection = rwConnection
+                } catch {
+                    // Close if validation failed
+                    try? await rwConnection.close()
+
+                    throw error
+                }
+            } catch {
+                // Fallback to immutable (read-only) mode for WAL databases or permission issues
+                let fileURI = "file:\(fileURL.path)?immutable=1"
+
+                newConnection = try await SQLiteConnection.open(
+                    storage: .file(path: fileURI)
+                )
+
+                // Validate the read-only connection and check for corruption
+                _ = try await newConnection.query("PRAGMA quick_check")
+
+                openedAsReadOnly = true
+            }
+        }
         
-        await MainActor.run {
-            self.openFileURL = fileURL
-            self.openAppInfo = appInfo
+        do {
+            var newMetadata: [String: Any]? = nil
+            var newModel: NSManagedObjectModel? = nil
+            
+            if fileURL.pathExtension == "store" {
+                (newMetadata, newModel) = try await loadModelCacheAndMetadata(from: fileURL, using: newConnection)
+            }
+            
+            // Close the old connection only after the new one is established and validated
+            if let oldConnection = self.connection {
+                try? await oldConnection.close()
+            }
+            
+            self.connection = newConnection
+            self.metadata = newMetadata
+            self.model = newModel
+
+            try await setDisplayMode()
+
+            let isReadOnly = openedAsReadOnly
+            
+            await MainActor.run {
+                self.openFileURL = fileURL
+                self.openAppInfo = appInfo
+                self.isReadOnly = isReadOnly
+            }
+        } catch {
+            // Close the new connection if setup fails
+            try? await newConnection.close()
+            
+            throw error
         }
     }
     
-    func closeConnection() throws {
-        try self.connection?.close().wait()
+    func closeConnection() async throws {
+        try await self.connection?.close()
     }
     
     func runQuery(_ query: String) async throws {
@@ -110,32 +174,32 @@ class SQLiteManager: ObservableObject {
         return try await handler(rows.all())
     }
     
-    private func loadModelCacheAndMetadata (from url: URL) async throws {
-        self.metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(
+    private func loadModelCacheAndMetadata(from url: URL, using connection: SQLiteConnection) async throws -> ([String: Any]?, NSManagedObjectModel?) {
+        let metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(
             ofType: NSSQLiteStoreType,
             at: url,
             options: nil
         )
 
         let query = "SELECT Z_CONTENT FROM Z_MODELCACHE"
-        let data =  try await self.runQuery(query, handler: { rows in
-            do  {
+        let rows = connection.sql().raw(SQLQueryString(query))
+        let data = try await { rows in
+            do {
                 let data = try rows.first?.decode(column: "Z_CONTENT", as: Data.self)
-                     
-                    //return data
                 let modelData = NSData(data: data!)
                 return try? modelData.decompressed(using: .zlib) as Data
             } catch {
                 print("Can't decode model cache: \(error.localizedDescription)")
             }
-                
             return nil
-        })
+        }(rows.all())
         
         let unarchiver = try NSKeyedUnarchiver(forReadingFrom: data!)
         unarchiver.requiresSecureCoding = false
         
-        self.model = unarchiver.decodeObject(of: NSManagedObjectModel.self, forKey: NSKeyedArchiveRootObjectKey)
+        let model = unarchiver.decodeObject(of: NSManagedObjectModel.self, forKey: NSKeyedArchiveRootObjectKey)
+        
+        return (metadata, model)
     }
     
     @MainActor

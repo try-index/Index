@@ -73,7 +73,7 @@
    </AnalyzeAction>
    <ArchiveAction
       buildConfiguration = "Release"
-      customArchiveName = "Data Inspector"
+      customArchiveName = "Index"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

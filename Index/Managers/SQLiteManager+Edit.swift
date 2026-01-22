@@ -1,6 +1,6 @@
 //
 //  SQLManager+Edit.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 6/3/25.
 //

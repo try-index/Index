@@ -1,6 +1,6 @@
 //
 //  PredicateBuilder.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 1/4/25.
 //

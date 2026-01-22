@@ -1,6 +1,6 @@
 //
 //  Application.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 25/11/24.
 //

@@ -1,6 +1,6 @@
 //
 //  Record.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 4/4/25.
 //

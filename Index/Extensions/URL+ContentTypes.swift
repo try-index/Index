@@ -1,6 +1,6 @@
 //
 //  URL+ContentTypes.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 27/11/24.
 //

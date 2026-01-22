@@ -1,6 +1,6 @@
 //
 //  AppLabel.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 26/11/24.
 //

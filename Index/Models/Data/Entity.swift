@@ -1,6 +1,6 @@
 //
 //  Entity.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 18/11/24.
 //

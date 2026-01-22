@@ -1,4 +1,4 @@
-# Contribute to Data Inspector
+# Contribute to Index
 
 ## Explore Issues
 

@@ -1,6 +1,6 @@
 //
 //  Table.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 11/3/25.
 //

@@ -5,7 +5,6 @@
 //  Created by Axel Martinez on 20/11/24.
 //
 
-import UniformTypeIdentifiers
 import SwiftUI
 import SQLiteNIO
 
@@ -23,27 +22,27 @@ struct FileMenu: View {
     
     var body: some View {
         HStack(spacing: 5) {
-            if let appInfo = sqlManager.openAppInfo,
-               let appIcon = appInfo.icon {
-                menuView(text: appInfo.name, content: {
-                    Button("Open File…") { self.isFileDialogOpen.toggle() }
-                    Button("Browse Simulators…") { self.isSimulatorsDialogOpen.toggle() }
-                }, label: { text in
-                    Label { Text(text) } icon: { Image(nsImage: appIcon) }
-                })
-            } else if let fileURL = sqlManager.openFileURL {
-                menuView(text: fileURL.deletingLastPathComponent().lastPathComponent, content: {
-                    Button("Open File…") { self.isFileDialogOpen.toggle() }
-                    Button("Browse Simulators…") { self.isSimulatorsDialogOpen.toggle() }
-                }, label: {
-                    Label($0, systemImage: "folder")
-                        .labelStyle(.titleAndIcon)
-                })
-            }
-            
             if let fileURL = sqlManager.openFileURL {
+                if let appInfo = sqlManager.openAppInfo,
+                   let appIcon = appInfo.icon {
+                    menuView(text: appInfo.name, content: {
+                        Button("Open File…") { self.isFileDialogOpen.toggle() }
+                        Button("Browse Simulators…") { self.isSimulatorsDialogOpen.toggle() }
+                    }, label: { text in
+                        Label { Text(text) } icon: { Image(nsImage: appIcon) }
+                    })
+                } else {
+                    menuView(text: fileURL.deletingLastPathComponent().lastPathComponent, content: {
+                        Button("Open File…") { self.isFileDialogOpen.toggle() }
+                        Button("Browse Simulators…") { self.isSimulatorsDialogOpen.toggle() }
+                    }, label: {
+                        Label($0, systemImage: "folder")
+                            .labelStyle(.titleAndIcon)
+                    })
+                }
+
                 Image(systemName: "chevron.forward")
-                
+
                 if sqlManager.openAppInfo?.fileURLs.count ?? 0 > 1 {
                     menuView(text: fileURL.lastPathComponent, content: {
                         if let fileURLs = self.sqlManager.openAppInfo?.fileURLs {
@@ -63,13 +62,14 @@ struct FileMenu: View {
                     Label(fileURL.lastPathComponent, systemImage: "square.stack.3d.up")
                         .labelStyle(.titleAndIcon)
                 }
+
+                if sqlManager.isReadOnly {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.secondary)
+                        .help("Opened as read-only")
+                }
             }
         }
-        .fileImporter(
-            isPresented: $isFileDialogOpen,
-            allowedContentTypes: URL.sqlLiteContentTypes,
-            onCompletion: loadFile
-        )
         .sheet(isPresented: $isSimulatorsDialogOpen, content: {
             SimulatorsView(sidebarVisibility: $sidebarVisibility)
                 .frame(width:800, height: 600)
@@ -130,25 +130,4 @@ struct FileMenu: View {
         }
     }
     
-    private func loadFile(result: Result<URL, any Error>) {
-        switch result {
-        case .success(let fileURL):
-            Task(priority: .userInitiated)  {
-                do {
-                    if fileURL.startAccessingSecurityScopedResource() {
-                        try await self.sqlManager.connect(fileURL: fileURL)
-                        
-                        self.sidebarVisibility = .all
-                        
-                        fileURL.stopAccessingSecurityScopedResource()
-                    }
-                } catch let error as SQLiteError {
-                    self.error = error
-                    self.showAlert = true
-                }
-            }
-        case .failure(let error):
-            print(error.localizedDescription)
-        }
-    }
 }

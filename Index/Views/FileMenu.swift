@@ -1,6 +1,6 @@
 //
 //  FileMenu.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 20/11/24.
 //

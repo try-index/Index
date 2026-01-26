@@ -1,6 +1,6 @@
 //
 //  MainView.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 13/11/24.
 //

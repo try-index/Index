@@ -1,6 +1,6 @@
 //
 //  String+Width.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 12/4/25.
 //

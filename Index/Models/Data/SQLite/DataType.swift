@@ -1,6 +1,6 @@
 //
 //  FileType.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 7/4/25.
 //

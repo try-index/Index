@@ -1,6 +1,6 @@
 //
 //  Simulator.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 21/11/24.
 //

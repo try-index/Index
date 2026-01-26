@@ -39,6 +39,9 @@
 		77C4BEE72DA01F64005B8317 /* Xcode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C4BEE62DA01F62005B8317 /* Xcode.swift */; };
 		77C4BEED2DA516A0005B8317 /* Data+String.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C4BEEC2DA5169A005B8317 /* Data+String.swift */; };
 		77C4BEF42DAA85B5005B8317 /* String+Width.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C4BEF32DAA85AB005B8317 /* String+Width.swift */; };
+		77D9DB252F27E7C2003AFB48 /* chinook.db in Resources */ = {isa = PBXBuildFile; fileRef = 77D9DB222F27E7C2003AFB48 /* chinook.db */; };
+		77D9DB262F27E7C2003AFB48 /* chatstorage.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = 77D9DB212F27E7C2003AFB48 /* chatstorage.sqlite */; };
+		77D9DB272F27E7C2003AFB48 /* data.db in Resources */ = {isa = PBXBuildFile; fileRef = 77D9DB232F27E7C2003AFB48 /* data.db */; };
 		86DE4D0125ABAAAA00AEA5A5 /* IndexApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DE4D0025ABAAAA00AEA5A5 /* IndexApp.swift */; };
 		86DE4D0325ABAAAA00AEA5A5 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DE4D0225ABAAAA00AEA5A5 /* MainView.swift */; };
 		86DE4D0525ABAAAC00AEA5A5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 86DE4D0425ABAAAC00AEA5A5 /* Assets.xcassets */; };
@@ -75,6 +78,9 @@
 		77C4BEE62DA01F62005B8317 /* Xcode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Xcode.swift; sourceTree = "<group>"; };
 		77C4BEEC2DA5169A005B8317 /* Data+String.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Data+String.swift"; sourceTree = "<group>"; };
 		77C4BEF32DAA85AB005B8317 /* String+Width.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Width.swift"; sourceTree = "<group>"; };
+		77D9DB212F27E7C2003AFB48 /* chatstorage.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = chatstorage.sqlite; sourceTree = "<group>"; };
+		77D9DB222F27E7C2003AFB48 /* chinook.db */ = {isa = PBXFileReference; lastKnownFileType = file; path = chinook.db; sourceTree = "<group>"; };
+		77D9DB232F27E7C2003AFB48 /* data.db */ = {isa = PBXFileReference; lastKnownFileType = file; path = data.db; sourceTree = "<group>"; };
 		86DE4CFD25ABAAAA00AEA5A5 /* Index.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Index.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		86DE4D0025ABAAAA00AEA5A5 /* IndexApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexApp.swift; sourceTree = "<group>"; };
 		86DE4D0225ABAAAA00AEA5A5 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -204,6 +210,16 @@
 			path = Themes;
 			sourceTree = "<group>";
 		};
+		77D9DB242F27E7C2003AFB48 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				77D9DB212F27E7C2003AFB48 /* chatstorage.sqlite */,
+				77D9DB222F27E7C2003AFB48 /* chinook.db */,
+				77D9DB232F27E7C2003AFB48 /* data.db */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		86DE4CF425ABAAAA00AEA5A5 = {
 			isa = PBXGroup;
 			children = (
@@ -228,6 +244,7 @@
 				77443B6E2CE75E2900B11F4D /* Managers */,
 				77443B6D2CE75E1300B11F4D /* Models */,
 				77443AFA2CE48E3600B11F4D /* Views */,
+				77D9DB242F27E7C2003AFB48 /* Resources */,
 				77443AF12CE4692100B11F4D /* Supporting Files */,
 				77C4BEE52DA01F3F005B8317 /* Themes */,
 				86DE4D0625ABAAAC00AEA5A5 /* Preview Content */,
@@ -306,6 +323,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				77D9DB252F27E7C2003AFB48 /* chinook.db in Resources */,
+				77D9DB262F27E7C2003AFB48 /* chatstorage.sqlite in Resources */,
+				77D9DB272F27E7C2003AFB48 /* data.db in Resources */,
 				86DE4D0525ABAAAC00AEA5A5 /* Assets.xcassets in Resources */,
 				772B005F2F2127C800AA5FAD /* Index.icon in Resources */,
 			);
@@ -492,7 +512,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Index/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -507,7 +527,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 0.3;
+				MARKETING_VERSION = 0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.index.Index;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -524,7 +544,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Index/Preview Content\"";
 				DEVELOPMENT_TEAM = ZTW69M5NDR;
@@ -539,7 +559,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 0.3;
+				MARKETING_VERSION = 0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.index.Index;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;

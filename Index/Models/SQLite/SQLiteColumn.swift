@@ -1,6 +1,6 @@
 //
 //  SQLiteColumnDescription.swift
-//  Data Inspector
+//  Index
 //
 //  Created by Axel Martinez on 13/3/25.
 //

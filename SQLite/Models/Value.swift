@@ -5,8 +5,8 @@
 //  Created by Axel Martinez on 13/3/25.
 //
 
-import SwiftUI
-import SQLiteKit
+import Foundation
+import AppKit
 
 public enum Value: Hashable {
     case smallint(Int16)

@@ -1,37 +1,36 @@
 //
-//  SQLManager+Edit.swift
+//  SQLiteClient+Edit.swift
 //  Index
 //
 //  Created by Axel Martinez on 6/3/25.
+//  Refactored to actor extension on 28/01/26.
 //
 
-extension SQLiteManager {
+import Foundation
+
+extension SQLiteClient {
     func addRecord(_ record: Record, to table: SQLiteTable) async throws {
-        // Prepare SQL query
         let columnNames = table.columns.map { $0.name }
         let insertClause = buildInsertClause(for: columnNames, in: record)
         let query = "INSERT INTO \(table.name) (\(insertClause)"
-        
-        // Execute query
+
         try await runQuery(query)
     }
-    
+
     func deleteRecords(_ records: [Record], from table: SQLiteTable) async throws {
         var statements: [String] = []
-        
+
         for record in records {
             statements.append(buildWhereClause(for: record, in: table))
         }
-        
+
         let whereClause = statements.joined(separator: " OR ")
-        
-        // Prepare SQL query
+
         let query = "DELETE FROM \(table.name) WHERE \(whereClause)"
-        
-        // Execute query
+
         try await runQuery(query)
     }
-    
+
     func updateRecord(
         _ record: Record,
         for columnName: String,
@@ -40,10 +39,10 @@ extension SQLiteManager {
         let setClause = buildSetClause(for: [columnName], in: record)
         let whereClause = buildWhereClause(for: record, in: table)
         let query = "UPDATE \(table.name) SET \(setClause) WHERE \(whereClause)"
-        
+
         try await runQuery(query)
     }
-    
+
     func updateRecord(
         _ record: Record,
         from table: SQLiteTable
@@ -51,14 +50,13 @@ extension SQLiteManager {
         let setClause = buildSetClause(for: table.columns.map { $0.name }, in: record)
         let whereClause = buildWhereClause(for: record, in: table)
         let query = "UPDATE \(table.name) SET \(setClause) WHERE \(whereClause)"
-        
+
         try await runQuery(query)
     }
 
     private func buildInsertClause(for columnNames: [String], in record: Record) -> String {
-        // Build insert query
         let columns = columnNames.joined(separator: ", ")
-        let values = record.values.compactMap{
+        let values = record.values.compactMap {
             switch record.values[$0.key] {
             case .text(let text):
                 return text
@@ -68,7 +66,7 @@ extension SQLiteManager {
                 return nil
             }
         }.joined(separator: ",")
-        
+
         return "(\(columns)) VALUES (\(values))"
     }
 
@@ -92,7 +90,7 @@ extension SQLiteManager {
             }
             return nil
         }.joined(separator: ",")
-        
+
         if whereClause.isEmpty {
             if let rowId = record.rowId {
                 whereClause = "rowid = \(rowId)"
@@ -100,7 +98,7 @@ extension SQLiteManager {
                 fatalError("Missing pk or rowId")
             }
         }
-        
+
         return whereClause
     }
 }

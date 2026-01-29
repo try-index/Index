@@ -7,28 +7,37 @@
 //
 
 import Foundation
+import SQLiteKit
 
 extension SQLiteClient {
     func addRecord(_ record: Record, to table: SQLiteTable) async throws {
-        let columnNames = table.columns.map { $0.name }
-        let insertClause = buildInsertClause(for: columnNames, in: record)
-        let query = "INSERT INTO \(table.name) (\(insertClause)"
+        var columnNames: [String] = []
+        var values: [any SQLExpression] = []
 
-        try await runQuery(query)
+        for column in table.columns {
+            if let value = record.values[column.name] {
+                columnNames.append(column.name)
+                values.append(sqlExpression(for: value))
+            }
+        }
+
+        try await db
+            .insert(into: table.name)
+            .columns(columnNames)
+            .values(values)
+            .run()
     }
 
     func deleteRecords(_ records: [Record], from table: SQLiteTable) async throws {
-        var statements: [String] = []
-
         for record in records {
-            statements.append(buildWhereClause(for: record, in: table))
+            var delete = try db.delete(from: table.name)
+
+            if let whereExpression = buildWhereExpression(for: record, in: table) {
+                delete = delete.where(whereExpression)
+            }
+
+            try await delete.run()
         }
-
-        let whereClause = statements.joined(separator: " OR ")
-
-        let query = "DELETE FROM \(table.name) WHERE \(whereClause)"
-
-        try await runQuery(query)
     }
 
     func updateRecord(
@@ -36,69 +45,93 @@ extension SQLiteClient {
         for columnName: String,
         from table: SQLiteTable
     ) async throws {
-        let setClause = buildSetClause(for: [columnName], in: record)
-        let whereClause = buildWhereClause(for: record, in: table)
-        let query = "UPDATE \(table.name) SET \(setClause) WHERE \(whereClause)"
+        guard let value = record.values[columnName] else { return }
 
-        try await runQuery(query)
+        var update = try db
+            .update(table.name)
+            .set(columnName, to: sqlExpression(for: value))
+
+        if let whereExpression = buildWhereExpression(for: record, in: table) {
+            update = update.where(whereExpression)
+        }
+
+        try await update.run()
     }
 
     func updateRecord(
         _ record: Record,
         from table: SQLiteTable
     ) async throws {
-        let setClause = buildSetClause(for: table.columns.map { $0.name }, in: record)
-        let whereClause = buildWhereClause(for: record, in: table)
-        let query = "UPDATE \(table.name) SET \(setClause) WHERE \(whereClause)"
+        var update = try db.update(table.name)
 
-        try await runQuery(query)
-    }
-
-    private func buildInsertClause(for columnNames: [String], in record: Record) -> String {
-        let columns = columnNames.joined(separator: ", ")
-        let values = record.values.compactMap {
-            switch record.values[$0.key] {
-            case .text(let text):
-                return text
-            case .integer(let integer):
-                return "\(integer)"
-            default:
-                return nil
-            }
-        }.joined(separator: ",")
-
-        return "(\(columns)) VALUES (\(values))"
-    }
-
-    private func buildSetClause(for columnNames: [String], in record: Record) -> String {
-        return columnNames.compactMap {
-            switch record.values[$0] {
-            case .text(let text):
-                return "\($0) = '\(text)'"
-            case .integer(let integer):
-                return "\($0) = \(integer)"
-            default:
-                return nil
-            }
-        }.joined(separator: ",")
-    }
-
-    private func buildWhereClause(for record: Record, in table: SQLiteTable) -> String {
-        var whereClause = table.columns.filter { $0.pk > 0 }.compactMap {
-            if let value = record.values[$0.name] {
-                return "\($0.name) = \(value)"
-            }
-            return nil
-        }.joined(separator: ",")
-
-        if whereClause.isEmpty {
-            if let rowId = record.rowId {
-                whereClause = "rowid = \(rowId)"
-            } else {
-                fatalError("Missing pk or rowId")
+        for column in table.columns {
+            if let value = record.values[column.name] {
+                update = update.set(column.name, to: sqlExpression(for: value))
             }
         }
 
-        return whereClause
+        if let whereExpression = buildWhereExpression(for: record, in: table) {
+            update = update.where(whereExpression)
+        }
+
+        try await update.run()
+    }
+
+    private func sqlExpression(for value: Value) -> any SQLExpression {
+        switch value {
+        case .null:
+            return SQLLiteral.null
+        case .smallint(let int16):
+            return SQLLiteral.numeric("\(int16)")
+        case .integer(let int):
+            return SQLLiteral.numeric("\(int)")
+        case .float(let float):
+            return SQLLiteral.numeric("\(float)")
+        case .real(let double):
+            return SQLLiteral.numeric("\(double)")
+        case .text(let string):
+            return SQLLiteral.string(string)
+        case .timestamp(let date):
+            return SQLLiteral.numeric("\(date.timeIntervalSince1970)")
+        case .array, .image:
+            return SQLLiteral.null
+        }
+    }
+
+    private func buildWhereExpression(for record: Record, in table: SQLiteTable) -> (any SQLExpression)? {
+        let pkColumns = table.columns.filter { $0.pk > 0 }
+
+        if !pkColumns.isEmpty {
+            var expressions: [any SQLExpression] = []
+
+            for column in pkColumns {
+                if let value = record.values[column.name] {
+                    let condition = SQLBinaryExpression(
+                        left: SQLColumn(column.name),
+                        op: SQLBinaryOperator.equal,
+                        right: sqlExpression(for: value)
+                    )
+                    expressions.append(condition)
+                }
+            }
+
+            if expressions.isEmpty {
+                return nil
+            }
+
+            return expressions.dropFirst().reduce(expressions.first!) { result, expr in
+                SQLBinaryExpression(left: result, op: SQLBinaryOperator.and, right: expr)
+            }
+        }
+
+        if let rowId = record.rowId {
+            return SQLBinaryExpression(
+                left: SQLColumn("rowid"),
+                op: SQLBinaryOperator.equal,
+                right: SQLLiteral.numeric("\(rowId)")
+            )
+        }
+
+        return nil
     }
 }

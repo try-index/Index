@@ -16,6 +16,12 @@ class DatabasesManager: ObservableObject {
     /// Set to true to show the open database modal from menu commands
     @Published var showOpenModal = false
 
+    /// Set to true when the databases window should be shown (e.g., last database closed)
+    @Published var shouldShowDatabasesWindow = false
+
+    /// Number of currently open database windows
+    private(set) var openDatabaseWindowCount = 0
+
     private let maxRecentDatabases = 50
     private let databasesKey = "recentDatabases"
     private let groupsKey = "databaseGroups"

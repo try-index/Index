@@ -10,6 +10,7 @@ import SwiftUI
 
 struct DatabaseView<T: SQLiteTable>: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
 
     @EnvironmentObject var databasesManager: DatabasesManager
     @EnvironmentObject var simManager: SimulatorsManager
@@ -151,6 +152,17 @@ struct DatabaseView<T: SQLiteTable>: View {
 
         Task {
             try? await client.close()
+        }
+
+        // Check if this is the last database window closing
+        // Count windows that are not the "Databases" window and not closing
+        let databaseWindows = NSApp.windows.filter { window in
+            window.title != "Databases" && window.isVisible
+        }
+
+        // If only one database window left (this one), show the databases window
+        if databaseWindows.count <= 1 {
+            openWindow(id: "databases")
         }
     }
 }

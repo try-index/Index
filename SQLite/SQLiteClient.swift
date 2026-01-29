@@ -42,7 +42,7 @@ actor SQLiteClient {
         _model
     }
 
-    private var db: any SQLDatabase {
+    var db: any SQLDatabase {
         get throws {
             guard let connection = connection, !connection.isClosed else {
                 throw SQLiteClientError.noConnection
@@ -119,46 +119,6 @@ actor SQLiteClient {
         _model = nil
     }
 
-    func execute(_ sql: String) async throws {
-        try await db.execute(sql: SQLQueryString(sql)) { _ in }
-    }
-
-    // MARK: - Query Methods
-
-    func runQuery(_ query: String) async throws {
-        try await db.execute(sql: SQLQueryString(query)) { _ in }
-    }
-
-    func runQuery<T>(_ query: String) async throws -> [T] where T: Decodable & Sendable {
-        let rows = try db.raw(SQLQueryString(query))
-        
-        return try await rows.all(decoding: T.self)
-    }
-
-    func runQuery<T>(_ query: String, mapping: (any SQLRow) throws -> T?) async throws -> [T] {
-        let rows = try db.raw(SQLQueryString(query))
-        
-        return try await rows.all().compactMap(mapping)
-    }
-
-    func runQuery<T>(_ query: String, column: String) async throws -> T? where T: Decodable & Sendable {
-        let row = try await db.raw(SQLQueryString(query)).first()
-        
-        return try row?.decode(column: column, as: T.self)
-    }
-
-    func runQuery(_ query: String, handler: @escaping @Sendable (any SQLRow) -> Void) async throws {
-        let rows = try db.raw(SQLQueryString(query))
-        
-        try await rows.run(handler)
-    }
-
-    func runQuery<T>(_ query: String, handler: @escaping @Sendable ([any SQLRow]) -> T) async throws -> T {
-        let rows = try db.raw(SQLQueryString(query))
-        
-        return try await handler(rows.all())
-    }
-
     // MARK: - Private Methods
 
     private func loadModelCacheAndMetadata(
@@ -171,24 +131,19 @@ actor SQLiteClient {
             options: nil
         )
 
-        let query = "SELECT Z_CONTENT FROM Z_MODELCACHE"
-        let rows = connection.sql().raw(SQLQueryString(query))
-        let data = try await { rows in
-            do {
-                let data = try rows.first?.decode(column: "Z_CONTENT", as: Data.self)
-                let modelData = NSData(data: data!)
-                return try? modelData.decompressed(using: .zlib) as Data
-            } catch {
-                print("Can't decode model cache: \(error.localizedDescription)")
-            }
-            return nil
-        }(rows.all())
+        let row = try await connection.sql()
+            .select()
+            .column("Z_CONTENT")
+            .from("Z_MODELCACHE")
+            .first()
 
-        guard let data = data else {
+        guard let row = row,
+              let contentData = try? row.decode(column: "Z_CONTENT", as: Data.self),
+              let decompressed = try? (contentData as NSData).decompressed(using: .zlib) as Data else {
             return (metadata, nil)
         }
 
-        let unarchiver = try NSKeyedUnarchiver(forReadingFrom: data)
+        let unarchiver = try NSKeyedUnarchiver(forReadingFrom: decompressed)
         unarchiver.requiresSecureCoding = false
 
         let model = unarchiver.decodeObject(of: NSManagedObjectModel.self, forKey: NSKeyedArchiveRootObjectKey)

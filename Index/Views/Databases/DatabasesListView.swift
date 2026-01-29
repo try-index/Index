@@ -22,47 +22,49 @@ struct DatabasesListView: View {
     var body: some View {
         Table(of: Database.self, selection: $selectedDatabaseID) {
             TableColumn("") { (database: Database) in
-                DatabaseRow(
-                    database: database,
-                    isSelected: selectedDatabaseID == database.id,
-                    onConnect: { onOpen(database) },
-                    onEdit: { databaseToEdit = database }
-                )
-                .frame(height: 44)
+                rowView(for: database)
             }
         } rows: {
             ForEach(databases) { database in
                 TableRow(database)
-                    .contextMenu {
-                        Button("Open") {
-                            onOpen(database)
-                        }
+            }
+        }
+        .contextMenu(forSelectionType: Database.ID.self) { selectedIDs in
+            if let id = selectedIDs.first,
+               let database = databases.first(where: { $0.id == id }) {
+                Button("Open") {
+                    onOpen(database)
+                }
 
-                        Button("Edit...") {
-                            databaseToEdit = database
-                        }
+                Button("Edit...") {
+                    databaseToEdit = database
+                }
 
-                        if !databasesManager.groups.isEmpty {
-                            Divider()
-                            Menu("Move to Group") {
-                                Button("No Group") {
-                                    databasesManager.moveDatabase(database, to: nil)
-                                }
-                                Divider()
-                                ForEach(databasesManager.groups) { group in
-                                    Button(group.name) {
-                                        databasesManager.moveDatabase(database, to: group)
-                                    }
-                                }
+                if !databasesManager.groups.isEmpty {
+                    Divider()
+                    Menu("Move to Group") {
+                        Button("No Group") {
+                            databasesManager.moveDatabase(database, to: nil)
+                        }
+                        Divider()
+                        ForEach(databasesManager.groups) { group in
+                            Button(group.name) {
+                                databasesManager.moveDatabase(database, to: group)
                             }
                         }
-
-                        Divider()
-
-                        Button("Delete", role: .destructive) {
-                            onRemove(database)
-                        }
                     }
+                }
+
+                Divider()
+
+                Button("Delete", role: .destructive) {
+                    onRemove(database)
+                }
+            }
+        } primaryAction: { selectedIDs in
+            if let id = selectedIDs.first,
+               let database = databases.first(where: { $0.id == id }) {
+                onOpen(database)
             }
         }
         .tableColumnHeaders(.hidden)
@@ -85,5 +87,15 @@ struct DatabasesListView: View {
                 }
             )
         }
+    }
+
+    private func rowView(for database: Database) -> some View {
+        DatabaseRow(
+            database: database,
+            isSelected: selectedDatabaseID == database.id,
+            onOpen: { onOpen(database) },
+            onEdit: { databaseToEdit = database }
+        )
+        .frame(height: 44)
     }
 }

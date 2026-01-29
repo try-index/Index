@@ -59,22 +59,29 @@ extension SQLiteClient {
     }
 
     func getRecords(from table: SQLiteTable) async throws -> [Record] {
-        let query = "SELECT ROWID as rowId,* FROM \(table.name)"
+        let rows = try await db
+            .select()
+            .column(SQLLiteral.all)
+            .column(SQLAlias(SQLColumn("ROWID"), as: SQLIdentifier("rowId")))
+            .from(table.name)
+            .all()
 
-        return try await runQuery(query, mapping: { row in
-            return try Record(row, from: table.columns)
-        })
+        return try rows.compactMap { row in
+            try Record(row, from: table.columns)
+        }
     }
 
     private func getTableNames() async throws -> [String] {
-        let query = """
-            SELECT name FROM sqlite_master
-            WHERE type='table'
-            AND name NOT LIKE 'sqlite_%'
-            ORDER BY name;
-            """
+        let rows = try await db
+            .select()
+            .column("name")
+            .from(SQLIdentifier("sqlite_master"))
+            .where("type", .equal, "table")
+            .where(SQLColumn("name"), .notLike, SQLLiteral.string("sqlite_%"))
+            .orderBy("name")
+            .all()
 
-        return try await runQuery(query) { row in
+        return try rows.compactMap { row in
             try row.decode(column: "name", as: String.self)
         }
     }
@@ -126,9 +133,11 @@ extension SQLiteClient {
     }
 
     private func getColumns(from tableName: String) async throws -> [SQLiteColumn] {
-        let query = "PRAGMA table_info(\(tableName));"
+        let rows = try await db
+            .raw("PRAGMA table_info(\(SQLLiteral.string(tableName)));")
+            .all()
 
-        return try await self.runQuery(query, mapping: { row in
+        return rows.compactMap { row in
             do {
                 let name = try row.decode(column: "name", as: String.self)
                 let dataType = try row.decode(column: "type", as: String.self)
@@ -143,15 +152,18 @@ extension SQLiteClient {
                 )
             } catch {
                 print("Can't decode table \(tableName): \(error.localizedDescription)")
+                return nil
             }
-
-            return nil
-        })
+        }
     }
 
     private func getRecordCount(_ tableName: String) async throws -> Int {
-        let query = "SELECT COUNT(*) as rowCount FROM \(tableName)"
+        let row = try await db
+            .select()
+            .column(SQLFunction("COUNT", args: SQLLiteral.all), as: "rowCount")
+            .from(tableName)
+            .first()
 
-        return try await runQuery(query, column: "rowCount") ?? 0
+        return try row?.decode(column: "rowCount", as: Int.self) ?? 0
     }
 }

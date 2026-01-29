@@ -10,7 +10,7 @@ import SwiftUI
 struct DatabaseRow: View {
     let database: Database
     let isSelected: Bool
-    let onConnect: () -> Void
+    let onOpen: () -> Void
     let onEdit: () -> Void
 
     @State private var isHovered = false
@@ -51,7 +51,7 @@ struct DatabaseRow: View {
                         .opacity(isHovered ? 0 : 1)
 
                     Button("Open") {
-                        onConnect()
+                        onOpen()
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)

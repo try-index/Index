@@ -11,24 +11,28 @@ import SwiftUI
 struct DatabaseView<T: SQLiteTable>: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
-
+    
     @EnvironmentObject var databasesManager: DatabasesManager
     @EnvironmentObject var simManager: SimulatorsManager
-
-    let databaseId: Database.ID
-
+    
+    let database: Database
+    
     @State private var client = SQLiteClient()
     @State private var accessedFolderURL: URL?
     @State private var databaseError: String?
     @State private var displayMode: DisplayMode = .SQLite
-    @State private var openFileURL: URL?
+    @State private var isFileMenuVisible: Bool = false
     @State private var showDatabaseError = false
     @State private var isConnected = false
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var selectedTable: T?
     @State private var searchText: String = ""
     @State private var refreshContent: PassthroughSubject<Void, Never> = .init()
-
+    
+    var fileURL: URL {
+        URL(filePath: database.filePath)
+    }
+    
     var body: some View {
         Group {
             if isConnected {
@@ -36,7 +40,6 @@ struct DatabaseView<T: SQLiteTable>: View {
                     DatabaseSidebar(
                         client: client,
                         displayMode: displayMode,
-                        openFileURL: openFileURL,
                         selection: $selectedTable
                     )
                 } detail: {
@@ -58,9 +61,18 @@ struct DatabaseView<T: SQLiteTable>: View {
                 .searchable(text: $searchText)
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
-                        PathIndicator(openFileURL: openFileURL)
+                        Button {
+                            isFileMenuVisible.toggle()
+                        } label: {
+                            Text(fileURL.lastPathComponent)
+                        }
+                        .popover(isPresented: $isFileMenuVisible, arrowEdge: .bottom, content: {
+                            FileMenu(fileURL: fileURL)
+                                .frame(minWidth: 200,  maxWidth: 400, minHeight: 100)
+                                .presentationCompactAdaptation(.popover)
+                        })
                     }
-
+                    
                     ToolbarItem(placement: .primaryAction) {
                         Button("", systemImage: "arrow.clockwise", action: {
                             refreshContent.send()
@@ -75,10 +87,10 @@ struct DatabaseView<T: SQLiteTable>: View {
         }
         .navigationTitle("")
         .onAppear {
-            connectToDatabase()
+            openDatabase()
         }
         .onDisappear {
-            cleanupDatabase()
+            closeDatabase()
         }
         .alert("Database Error", isPresented: $showDatabaseError) {
             Button("Close") {
@@ -88,22 +100,16 @@ struct DatabaseView<T: SQLiteTable>: View {
             Text(databaseError ?? "Failed to open the database file.")
         }
     }
-
+    
     // MARK: - Connection
-
-    private func connectToDatabase() {
-        guard let database = databasesManager.recentDatabases.first(where: { $0.id == databaseId }) else {
-            databaseError = "Database not found. It may have been deleted."
-            showDatabaseError = true
-            return
-        }
-
+    
+    private func openDatabase() {
         guard let url = databasesManager.resolveURL(for: database) else {
             databaseError = "Could not access the file. It may have been moved or deleted."
             showDatabaseError = true
             return
         }
-
+        
         Task {
             guard url.startAccessingSecurityScopedResource() else {
                 await MainActor.run {
@@ -112,61 +118,63 @@ struct DatabaseView<T: SQLiteTable>: View {
                 }
                 return
             }
-
-            accessedFolderURL?.stopAccessingSecurityScopedResource()
+            
             accessedFolderURL = url
-
+            
             do {
                 try await client.connect(to: url)
+                
                 databasesManager.updateLastOpened(for: database)
-
-                let mode = await determineDisplayMode()
-
+                
+                let mode = await configureDisplayMode()
+                
                 await MainActor.run {
                     displayMode = mode
-                    openFileURL = url
                     isConnected = true
                 }
             } catch {
-                url.stopAccessingSecurityScopedResource()
-
                 await MainActor.run {
                     databaseError = error.localizedDescription
                     showDatabaseError = true
                 }
             }
+            
+            accessedFolderURL?.stopAccessingSecurityScopedResource()
         }
     }
-
-    private func determineDisplayMode() async -> DisplayMode {
-        guard let metadata = await client.metadata,
-              let version = metadata["NSPersistenceFrameworkVersion"] as? Int else {
-            return .SQLite
-        }
-
-        return version > 800 ? .SwiftData : .CoreData
-    }
-
-    private func cleanupDatabase() {
+    
+    private func closeDatabase() {
         accessedFolderURL?.stopAccessingSecurityScopedResource()
-
+        
         Task {
             try? await client.close()
         }
-
+        
         // Check if this is the last database window closing
         // Count windows that are not the "Databases" window and not closing
         let databaseWindows = NSApp.windows.filter { window in
             window.title != "Databases" && window.isVisible
         }
-
+        
         // If only one database window left (this one), show the databases window
         if databaseWindows.count <= 1 {
             openWindow(id: "databases")
         }
     }
+    
+    private func configureDisplayMode() async -> DisplayMode {
+        guard let metadata = await client.metadata,
+              let version = metadata["NSPersistenceFrameworkVersion"] as? Int else {
+            return .SQLite
+        }
+        
+        return version > 800 ? .SwiftData : .CoreData
+    }
 }
 
 #Preview {
-    DatabaseView<SQLiteTable>(databaseId: UUID())
+    /*DatabaseView<SQLiteTable>(
+     database: Database(),
+     fileURL: URL(fileURLWithPath: "test")
+     )*/
 }

@@ -35,7 +35,7 @@ struct EditDatabaseView: View {
                 }
 
                 LabeledContent("Last Opened") {
-                    Text(database.lastOpened.ISO8601Format())
+                    Text(database.lastOpened, format: .dateTime.month().day().year().hour().minute())
                         .foregroundStyle(.secondary)
                 }
             }

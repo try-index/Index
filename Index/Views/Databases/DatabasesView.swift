@@ -27,14 +27,13 @@ struct DatabasesView: View {
     @EnvironmentObject var simManager: SimulatorsManager
 
     @State private var showOpenDatabaseModal = false
-    @State private var showSimulatorsSheet = false
+    @State private var showSimulatorsModal = false
     @State private var showNewGroupAlert = false
     @State private var newGroupName = ""
     @State private var selectedSidebarItem: SidebarItem? = .allDatabases
     @State private var selectedDatabase: Database?
     @State private var databaseError: String?
     @State private var showDatabaseError = false
-    @State private var simulatorSidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var searchText: String = ""
     @State private var displayMode: DatabasesDisplayMode = .list
 
@@ -172,13 +171,14 @@ struct DatabasesView: View {
                     openDatabase(url: url, forceReadOnly: forceReadOnly)
                 },
                 onBrowseSimulators: {
-                    showSimulatorsSheet = true
+                    showOpenDatabaseModal = false
+                    showSimulatorsModal = true
                 }
             )
         }
-        .sheet(isPresented: $showSimulatorsSheet) {
+        .sheet(isPresented: $showSimulatorsModal) {
             SimulatorsView(
-                sidebarVisibility: $simulatorSidebarVisibility,
+                sidebarVisibility: .constant(.all),
                 onDatabaseOpened: { database in
                     openWindow(value: database.id)
                     dismissWindow(id: "databases")
@@ -186,7 +186,6 @@ struct DatabasesView: View {
             )
             .environmentObject(simManager)
             .environmentObject(databasesManager)
-            .frame(width: 800, height: 600)
         }
         .alert("New Group", isPresented: $showNewGroupAlert) {
             TextField("Group Name", text: $newGroupName)

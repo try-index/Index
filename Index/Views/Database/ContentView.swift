@@ -72,7 +72,6 @@ struct ContentView<T: SQLiteTable>: View {
                     }
                     .font(.headline)
                     .padding(.vertical)
-                    .background(.white)
 
                     Table(filteredRecords, selection: $selectedRecords) {
                         TableColumnForEach(properties, id:\.name) { property in

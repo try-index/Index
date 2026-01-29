@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum SimulatorManagerError: LocalizedError {
+enum SimulatorsManagerError: LocalizedError {
     case simulatorPathNotFound
     case deviceInfoNotFound
     case containerInfoNotFound
@@ -24,7 +24,7 @@ enum SimulatorManagerError: LocalizedError {
     }
 }
 
-class SimulatorManager: ObservableObject {
+class SimulatorsManager: ObservableObject {
     func loadSimulators(from: URL) -> [Simulator] {
         do {
             var simulators = [Simulator]()
@@ -168,7 +168,7 @@ class SimulatorManager: ObservableObject {
         let containerPath = appFolder.appendingPathComponent(".com.apple.mobile_container_manager.metadata.plist")
         
         guard let containerInfo = NSDictionary(contentsOf: containerPath) else {
-            throw SimulatorManagerError.containerInfoNotFound
+            throw SimulatorsManagerError.containerInfoNotFound
         }
         
         return containerInfo["MCMMetadataIdentifier"] as? String

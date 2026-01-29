@@ -9,18 +9,17 @@ import SwiftUI
 
 struct SimulatorFilesView: View {
     @Environment(\.dismiss) var dismiss
-    
-    @EnvironmentObject var sqlManager: SQLiteManager
-    @EnvironmentObject var simManager: SimulatorManager
-    
+
+    @EnvironmentObject var simManager: SimulatorsManager
+
     @Binding var selectedFileInfo: FileInfo?
-    
+
     @State private var isLoading: Bool = false
     @State private var applications: [AppInfo] = []
-    
+
     let openFile: (FileInfo, Bool) async throws -> Void
     let simulatorURL: URL
-    
+
     var body: some View {
         Group {
             if isLoading {
@@ -52,12 +51,12 @@ struct SimulatorFilesView: View {
         .onAppear(perform: loadApps)
         .onChange(of: simulatorURL, loadApps)
     }
-    
+
     func loadApps() {
         self.isLoading = true
-        
+
         self.applications = self.simManager.getSimulatorApps(at: simulatorURL)
-        
+
         self.isLoading = false
     }
 }

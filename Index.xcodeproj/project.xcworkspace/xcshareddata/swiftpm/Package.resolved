@@ -1,5 +1,5 @@
 {
-  "originHash" : "db4521e6d4a0844b114358ac434e45639088243bb7580b4841657d324d7509a9",
+  "originHash" : "0fda5aa851158959e8bc1b1e84f1221175e40b057e78dabe057b6ba2231270df",
   "pins" : [
     {
       "identity" : "async-kit",
@@ -22,7 +22,7 @@
     {
       "identity" : "sqlite-kit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/vapor/sqlite-kit",
+      "location" : "https://github.com/vapor/sqlite-kit.git",
       "state" : {
         "revision" : "f35a863ecc2da5d563b836a9a696b148b0f4169f",
         "version" : "4.5.2"

@@ -9,11 +9,12 @@ import SwiftUI
 
 struct SimulatorsView: View {
     @Environment(\.dismiss) var dismiss
-    
-    @EnvironmentObject var sqlManager: SQLiteManager
-    @EnvironmentObject var simManager: SimulatorManager
-    
+
+    @EnvironmentObject var simManager: SimulatorsManager
+    @EnvironmentObject var databasesManager: DatabasesManager
+
     @Binding var sidebarVisibility: NavigationSplitViewVisibility
+    var onDatabaseOpened: (Database) -> Void
     
     @State private var isHomeBookmarkInvalid = false
     @State private var isFolderDialogOpen = false
@@ -159,8 +160,15 @@ struct SimulatorsView: View {
     }
     
     func openFile(fileInfo: FileInfo, forceReadOnly: Bool = false) async throws {
-        try await self.sqlManager.connect(fileURL: fileInfo.url, appInfo: fileInfo.appInfo, forceReadOnly: forceReadOnly)
+        // Add to recent databases
+        databasesManager.addDatabase(from: fileInfo.url)
 
-        self.dismiss()
+        // Find the newly added database
+        if let database = databasesManager.recentDatabases.first(where: { $0.filePath == fileInfo.url.path }) {
+            await MainActor.run {
+                onDatabaseOpened(database)
+                self.dismiss()
+            }
+        }
     }
 }

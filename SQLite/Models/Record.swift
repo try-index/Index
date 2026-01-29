@@ -6,8 +6,8 @@
 //
 
 import Foundation
+import AppKit
 import SQLiteKit
-import SwiftUI
 
 struct Record: Identifiable, Equatable, Hashable {
     var id: UUID

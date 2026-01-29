@@ -14,7 +14,9 @@ struct SimulatorsView: View {
     @EnvironmentObject var databasesManager: DatabasesManager
 
     @Binding var sidebarVisibility: NavigationSplitViewVisibility
+    
     var onDatabaseOpened: (Database) -> Void
+    var onClose: (() -> Void)?
     
     @State private var isHomeBookmarkInvalid = false
     @State private var isFolderDialogOpen = false
@@ -71,9 +73,16 @@ struct SimulatorsView: View {
                 ContentUnavailableView("Select a simulator", systemImage: "macbook.and.iphone")
             }
         }
+        .frame(width: 800, height: 500)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Close") { self.dismiss() }
+                Button("Close") {
+                    if let onClose {
+                        onClose()
+                    } else {
+                        dismiss()
+                    }
+                }
             }
 
             ToolbarItem(placement: .principal) {
@@ -125,8 +134,8 @@ struct SimulatorsView: View {
                 }
             }
         )
-        .fileDialogConfirmationLabel("Grant Access")
         .fileDialogMessage("Allow access to your home directory to load simulators")
+        .fileDialogConfirmationLabel("Grant Access")
         .fileDialogDefaultDirectory(userDirectory)
         .onAppear {
             do {
@@ -167,7 +176,12 @@ struct SimulatorsView: View {
         if let database = databasesManager.recentDatabases.first(where: { $0.filePath == fileInfo.url.path }) {
             await MainActor.run {
                 onDatabaseOpened(database)
-                self.dismiss()
+                
+                if let onClose {
+                    onClose()
+                } else {
+                    dismiss()
+                }
             }
         }
     }

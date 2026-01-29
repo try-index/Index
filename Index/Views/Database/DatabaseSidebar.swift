@@ -11,14 +11,13 @@ import SQLiteKit
 struct DatabaseSidebar<T: SQLiteTable>: View {
     let client: SQLiteClient
     let displayMode: DisplayMode
-    let openFileURL: URL?
-
+    
     @Binding var selection: T?
-
+    
     @State private var dataObjects = [T]()
     @State private var error: SQLiteError? = nil
     @State private var showAlert = false
-
+    
     var body: some View {
         VStack {
             List(selection: $selection) {
@@ -70,59 +69,51 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
         } message: { error in
             Text(error.recoverySuggestion ?? "Try opening a different file")
         }
-        .onAppear {
-            loadData()
-        }
-        .onChange(of: openFileURL) { _, _ in
-            loadData()
+        .task {
+            await loadData()
         }
     }
-
-    private func loadData() {
-        guard openFileURL != nil else { return }
-
-        Task {
-            do {
-                var loadedObjects = [T]()
-
-                switch displayMode {
-                case .SwiftData:
-                    if let models = try await client.getModels() as? [T] {
-                        loadedObjects = models
-                    }
-                case .CoreData:
-                    if let entities = try await client.getEntities() as? [T] {
-                        loadedObjects = entities
-                    }
-                default:
-                    if let tables = try await client.getTables() as? [T] {
-                        loadedObjects = tables
-                    }
+    
+    private func loadData() async {
+        do {
+            var loadedObjects = [T]()
+            
+            switch displayMode {
+            case .SwiftData:
+                if let models = try await client.getModels() as? [T] {
+                    loadedObjects = models
                 }
-
-                await MainActor.run {
-                    self.dataObjects = loadedObjects
-                    self.selection = loadedObjects.first
+            case .CoreData:
+                if let entities = try await client.getEntities() as? [T] {
+                    loadedObjects = entities
                 }
-            } catch let error as SQLiteError {
-                await MainActor.run {
-                    self.error = error
-                    self.showAlert = true
+            default:
+                if let tables = try await client.getTables() as? [T] {
+                    loadedObjects = tables
                 }
-            } catch {
-                print("Failed to load data: \(error)")
             }
+            
+            await MainActor.run {
+                self.dataObjects = loadedObjects
+                self.selection = loadedObjects.first
+            }
+        } catch let error as SQLiteError {
+            await MainActor.run {
+                self.error = error
+                self.showAlert = true
+            }
+        } catch {
+            print("Failed to load data: \(error)")
         }
     }
 }
 
 #Preview {
     @Previewable @State var selection: SQLiteTable?
-
+    
     DatabaseSidebar<SQLiteTable>(
         client: SQLiteClient(),
         displayMode: .SQLite,
-        openFileURL: nil,
         selection: $selection
     )
 }

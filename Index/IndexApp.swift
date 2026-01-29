@@ -36,8 +36,9 @@ struct IndexApp: App {
 
         // Database windows - one per database
         WindowGroup(for: Database.ID.self) { $databaseId in
-            if let databaseId = databaseId {
-                DatabaseView<SQLiteTable>(databaseId: databaseId)
+            if let databaseId = databaseId,
+               let database = databasesManager.recentDatabases.first(where: { $0.id == databaseId }) {
+                DatabaseView<SQLiteTable>(database: database)
                     .environmentObject(databasesManager)
                     .environmentObject(simManager)
                     .onAppear {

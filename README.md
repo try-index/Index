@@ -6,14 +6,29 @@
 Index is a powerful, intuitive database client application designed exclusively for macOS, providing developers with a comprehensive tool for editing and exploring databases used on app development.
 
 <p align="center">
-  <a href="https://apps.apple.com/es/app/data-inspector-db-client/id6738792254">
+  <a href="https://testflight.apple.com/join/cFzQ6T3X">
       <img src="https://github.com/try-index/Index/blob/main/.github/store_badge.svg">
   </a>
 </p>
 
 ## Getting Started
 
-Open a database using the buttons on the main window select the desired model to load its records.
+### Opening a Database from a File
+
+1. Click the + button on the databases window or select "Open..." from the Database menu.
+2. Select the "Open SQLite File" option from the modal.
+3. Give the app permission to access the folder if necessary.
+4. Select the file and click "Open"
+5. Choose the desired model or table from the sidebar to load its records.
+
+### Opening a Database from a Simulator
+
+1. Click the + button on the databases window or select "Open..." from the Database menu.
+2. Select the "Browse Simulators" option from the modal.
+3. Give the app permission to access the simulators folder.
+4. Index will automatically list the available simulators and the apps in them.
+5. Select the database file inside the app to open.
+6. Choose the desired model or table from the sidebar to load its records.
 
 ## Contributing
 

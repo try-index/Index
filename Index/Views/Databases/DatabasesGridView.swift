@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct DatabasesGridView: View {
-    @EnvironmentObject var databasesManager: DatabasesManager
+    @Environment(DatabasesManager.self) var databasesManager
 
     let databases: [Database]
+     
     @Binding var selectedDatabase: Database?
 
     let onOpen: (Database) -> Void

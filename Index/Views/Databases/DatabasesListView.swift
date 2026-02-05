@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct DatabasesListView: View {
-    @EnvironmentObject var databasesManager: DatabasesManager
-
+    @Environment(DatabasesManager.self) var databasesManager
+    
     let databases: [Database]
     let onOpen: (Database) -> Void
     let onRemove: (Database) -> Void

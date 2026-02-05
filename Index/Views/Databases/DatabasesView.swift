@@ -22,9 +22,8 @@ enum DatabasesDisplayMode: String, CaseIterable {
 struct DatabasesView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
-
-    @EnvironmentObject var databasesManager: DatabasesManager
-    @EnvironmentObject var simManager: SimulatorsManager
+    @Environment(DatabasesManager.self) var databasesManager
+    @Environment(SimulatorsManager.self) var simManager
 
     @State private var showOpenDatabaseModal = false
     @State private var showSimulatorsModal = false
@@ -63,7 +62,7 @@ struct DatabasesView: View {
                 onAddGroup: { showNewGroupAlert = true },
                 onDeleteGroup: deleteSelectedGroup
             )
-            .environmentObject(databasesManager)
+            .environment(databasesManager)
         } detail: {
             // Main content
             if databasesManager.recentDatabases.isEmpty {
@@ -79,7 +78,7 @@ struct DatabasesView: View {
                         onRemove: removeRecentDatabase,
                         selectedDatabase: $selectedDatabase
                     )
-                    .environmentObject(databasesManager)
+                    .environment(databasesManager)
                 case .icons:
                     DatabasesGridView(
                         databases: filteredDatabases,
@@ -87,7 +86,7 @@ struct DatabasesView: View {
                         onOpen: openRecentDatabase,
                         onRemove: removeRecentDatabase
                     )
-                    .environmentObject(databasesManager)
+                    .environment(databasesManager)
                 }
             }
         }
@@ -184,8 +183,8 @@ struct DatabasesView: View {
                     dismissWindow(id: "databases")
                 }
             )
-            .environmentObject(simManager)
-            .environmentObject(databasesManager)
+            .environment(simManager)
+            .environment(databasesManager)
         }
         .alert("New Group", isPresented: $showNewGroupAlert) {
             TextField("Group Name", text: $newGroupName)

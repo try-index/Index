@@ -11,10 +11,9 @@ import SwiftUI
 struct DatabaseView<T: SQLiteTable>: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
-    
-    @EnvironmentObject var databasesManager: DatabasesManager
-    @EnvironmentObject var simManager: SimulatorsManager
-    
+    @Environment(DatabasesManager.self) var databasesManager
+    @Environment(SimulatorsManager.self) var simManager
+
     let database: Database
     
     @State private var client = SQLiteClient()

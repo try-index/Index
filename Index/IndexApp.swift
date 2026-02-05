@@ -9,9 +9,9 @@ import SwiftUI
 
 @main
 struct IndexApp: App {
-    @StateObject private var databasesManager = DatabasesManager()
-    @StateObject private var simManager = SimulatorsManager()
-
+    @State private var databasesManager = DatabasesManager()
+    @State private var simManager = SimulatorsManager()
+    
     @Environment(\.openWindow) private var openWindow
 
     init() {
@@ -25,8 +25,8 @@ struct IndexApp: App {
         // Databases window - shows on launch
         Window("Databases", id: "databases") {
             DatabasesView()
-                .environmentObject(databasesManager)
-                .environmentObject(simManager)
+                .environment(databasesManager)
+                .environment(simManager)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
                 }
@@ -39,8 +39,8 @@ struct IndexApp: App {
             if let databaseId = databaseId,
                let database = databasesManager.recentDatabases.first(where: { $0.id == databaseId }) {
                 DatabaseView<SQLiteTable>(database: database)
-                    .environmentObject(databasesManager)
-                    .environmentObject(simManager)
+                    .environment(databasesManager)
+                    .environment(simManager)
                     .onAppear {
                         NSWindow.allowsAutomaticWindowTabbing = false
                     }

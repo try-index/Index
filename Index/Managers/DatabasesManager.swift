@@ -9,15 +9,15 @@ import Foundation
 import SwiftUI
 
 /// Manages saved databases and recent history
-class DatabasesManager: ObservableObject {
-    @Published var recentDatabases: [Database] = []
-    @Published var groups: [DatabaseGroup] = []
+@Observable class DatabasesManager {
+    var recentDatabases: [Database] = []
+    var groups: [DatabaseGroup] = []
 
     /// Set to true to show the open database modal from menu commands
-    @Published var showOpenModal = false
+    var showOpenModal = false
 
     /// Set to true when the databases window should be shown (e.g., last database closed)
-    @Published var shouldShowDatabasesWindow = false
+    var shouldShowDatabasesWindow = false
 
     /// Number of currently open database windows
     private(set) var openDatabaseWindowCount = 0

@@ -21,6 +21,20 @@
                ReferencedContainer = "container:Index.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "775C9F6C2F2A42FB00849465"
+               BuildableName = "libSQLite.dylib"
+               BlueprintName = "SQLite"
+               ReferencedContainer = "container:Index.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct DatabasesSidebar: View {
-    @EnvironmentObject var databasesManager: DatabasesManager
+    @Environment(DatabasesManager.self) var databasesManager
 
     @Binding var selectedSidebarItem: SidebarItem?
 

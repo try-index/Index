@@ -9,9 +9,8 @@ import SwiftUI
 
 struct SimulatorsView: View {
     @Environment(\.dismiss) var dismiss
-
-    @EnvironmentObject var simManager: SimulatorsManager
-    @EnvironmentObject var databasesManager: DatabasesManager
+    @Environment(DatabasesManager.self) var databasesManager
+    @Environment(SimulatorsManager.self) var simManager
 
     @Binding var sidebarVisibility: NavigationSplitViewVisibility
     

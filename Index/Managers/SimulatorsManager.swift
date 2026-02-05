@@ -24,7 +24,7 @@ enum SimulatorsManagerError: LocalizedError {
     }
 }
 
-class SimulatorsManager: ObservableObject {
+@Observable class SimulatorsManager {
     func loadSimulators(from: URL) -> [Simulator] {
         do {
             var simulators = [Simulator]()

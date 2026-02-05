@@ -9,8 +9,7 @@ import SwiftUI
 
 struct SimulatorFilesView: View {
     @Environment(\.dismiss) var dismiss
-
-    @EnvironmentObject var simManager: SimulatorsManager
+    @Environment(SimulatorsManager.self) var simManager
 
     @Binding var selectedFileInfo: FileInfo?
 

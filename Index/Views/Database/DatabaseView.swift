@@ -85,45 +85,47 @@ struct DatabaseView<T: SQLiteTable>: View {
                 .searchable(text: $searchText)
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
-                        HStack(spacing: 6) {
-                            Button {
-                                isFileMenuVisible.toggle()
-                            } label: {
+                        Button {
+                            isFileMenuVisible.toggle()
+                        } label: {
+                            HStack(spacing: 4) {
                                 Text(fileURL.lastPathComponent)
-                            }
-                            .popover(isPresented: $isFileMenuVisible, arrowEdge: .bottom, content: {
-                                FileMenu(fileURL: fileURL)
-                                    .frame(minWidth: 200,  maxWidth: 400, minHeight: 100)
-                                    .presentationCompactAdaptation(.popover)
-                            })
-                            
-                            if isReadOnly {
-                                
-                                Image(systemName: "lock.fill")
+                                Image(systemName: "chevron.down")
                                     .font(.system(size: 10))
-                                
                                     .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(.quaternary)
-                                    .clipShape(Capsule())
                             }
                         }
+                        .popover(isPresented: $isFileMenuVisible, arrowEdge: .bottom, content: {
+                            FileMenu(fileURL: fileURL)
+                                .frame(minWidth: 200,  maxWidth: 400, minHeight: 100)
+                                .presentationCompactAdaptation(.popover)
+                        })
                     }
                     
                     ToolbarItem(placement: .primaryAction) {
                         HStack(spacing: 8) {
-                            Button("", systemImage: "plus", action: {
-                                requestAddRecord()
-                            })
-                            .disabled(selectedTab == nil || isReadOnly)
-                            .help(isReadOnly ? "Cannot add records (Read Only)" : "Add Record")
-                            
-                            Button("", systemImage: "trash", action: {
-                                requestDeleteRecords()
-                            })
-                            .disabled(selectedRecordsCount == 0 || isReadOnly)
-                            .help(isReadOnly ? "Cannot delete records (Read Only)" : "Delete Selected Records (\(selectedRecordsCount))")
+                            if isReadOnly {
+                                Text("READ ONLY")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary)
+                                    .clipShape(Capsule())
+                                    .padding(.leading, 8)
+                            } else {
+                                Button("", systemImage: "plus", action: {
+                                    requestAddRecord()
+                                })
+                                .disabled(selectedTab == nil)
+                                .help("Add Record")
+                                
+                                Button("", systemImage: "trash", action: {
+                                    requestDeleteRecords()
+                                })
+                                .disabled(selectedRecordsCount == 0)
+                                .help("Delete Selected Records (\(selectedRecordsCount))")
+                            }
                             
                             Divider()
                                 .frame(height: 16)
@@ -177,7 +179,8 @@ struct DatabaseView<T: SQLiteTable>: View {
                 },
                 isUtilityExpanded: $isUtilityExpanded,
                 selectedRecordsCount: $selectedRecordsCount,
-                isReadOnly: isReadOnly
+                isReadOnly: isReadOnly,
+                displayMode: displayMode
             )
             
             // Utility drawer
@@ -330,7 +333,22 @@ struct DatabaseView<T: SQLiteTable>: View {
             return .SQLite
         }
         
-        return version > 800 ? .SwiftData : .CoreData
+        // Force read-only mode for CoreData/SwiftData until custom UI is implemented
+        let mode: DisplayMode = version > 800 ? .SwiftData : .CoreData
+        
+        // Reconnect in read-only mode if not already
+        if !(await client.isReadOnly) {
+            if let url = databasesManager.resolveURL(for: database) {
+                _ = try? await client.connect(
+                    to: url,
+                    bookmarkData: database.bookmark,
+                    directoryBookmarkData: database.directoryBookmark,
+                    readOnly: true
+                )
+            }
+        }
+        
+        return mode
     }
     
     // MARK: - Record Actions

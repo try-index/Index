@@ -36,6 +36,7 @@ struct ContentView<T: SQLiteTable>: View {
     @Binding var selectedRecordsCount: Int
     
     var isReadOnly: Bool = false
+    var displayMode: DisplayMode = .SQLite
 
     var filteredRecords: [Record] {
         // Combine new records with existing records (new records at the bottom)
@@ -84,6 +85,7 @@ struct ContentView<T: SQLiteTable>: View {
                         records: filteredRecords,
                         properties: properties,
                         isReadOnly: isReadOnly,
+                        displayMode: displayMode,
                         newRecordIds: Set(newRecords.map { $0.id }),
                         selectedRecords: $selectedRecords,
                         scrollToRecordId: editingRecordId,
@@ -369,7 +371,7 @@ struct ContentView<T: SQLiteTable>: View {
             if property.column.notNull {
                 if let value = record.values[property.column.name] {
                     switch value {
-                    case .null:
+                    case .null, .undefined:
                         allRequiredFieldsFilled = false
                     case .text(let str) where str.isEmpty:
                         allRequiredFieldsFilled = false
@@ -463,6 +465,8 @@ struct ContentView<T: SQLiteTable>: View {
         switch value {
         case .null:
             return "NULL"
+        case .undefined:
+            return ""
         case .integer(let int):
             return "\(int)"
         case .smallint(let int):
@@ -473,6 +477,12 @@ struct ContentView<T: SQLiteTable>: View {
             return "\(float)"
         case .text(let string):
             return string
+        case .uuid(let uuid):
+            return uuid.uuidString
+        case .data(let string):
+            return string
+        case .enumValue(let caseName):
+            return ".\(caseName)"
         case .timestamp(let date):
             return date.ISO8601Format()
         case .array, .image:

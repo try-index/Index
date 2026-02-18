@@ -65,41 +65,55 @@ actor SQLiteClient {
     func requestDirectoryAccess(for fileURL: URL) async -> DirectoryAccessResponse {
         let parentDirectory = fileURL.deletingLastPathComponent()
         
-        let panel = NSOpenPanel()
-        panel.message = """
+        // First, show alert asking user what they want to do
+        let alert = NSAlert()
+        alert.messageText = "Database Access Required"
+        alert.informativeText = """
         To write to this database, Index needs access to the '\(parentDirectory.lastPathComponent)' folder.
-        Select the folder to grant access, or click 'Open Read-Only' to continue without write permissions.
+        
+        You can grant access to enable editing, or open the database in read-only mode.
         """
-        panel.prompt = "Grant Access"
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = false
-        panel.directoryURL = parentDirectory
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Grant Access")
+        alert.addButton(withTitle: "Open Read-Only")
+        alert.addButton(withTitle: "Cancel")
         
-        // Add "Open Read-Only" button as accessory
-        let readOnlyButton = NSButton(title: "Open Read-Only", target: nil, action: nil)
-        readOnlyButton.bezelStyle = .rounded
-        panel.accessoryView = readOnlyButton
+        let response = alert.runModal()
         
-        let response = panel.runModal()
-        
-        // Check if user clicked the "Open Read-Only" button
-        if readOnlyButton.state == .on {
+        switch response {
+        case .alertFirstButtonReturn:
+            // User chose "Grant Access" - show folder picker
+            let panel = NSOpenPanel()
+            panel.message = "Select the '\(parentDirectory.lastPathComponent)' folder to grant write access."
+            panel.prompt = "Grant Access"
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = false
+            panel.directoryURL = parentDirectory
+            
+            let panelResponse = panel.runModal()
+            
+            guard panelResponse == .OK, let selectedURL = panel.url else {
+                return .cancelled
+            }
+            
+            // Create security-scoped bookmark for the directory
+            if let bookmark = try? selectedURL.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            ) {
+                return .granted(bookmark)
+            } else {
+                return .cancelled
+            }
+            
+        case .alertSecondButtonReturn:
+            // User chose "Open Read-Only"
             return .openReadOnly
-        }
-        
-        guard response == .OK, let selectedURL = panel.url else {
-            return .cancelled
-        }
-        
-        // Create security-scoped bookmark for the directory
-        if let bookmark = try? selectedURL.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ) {
-            return .granted(bookmark)
-        } else {
+            
+        default:
+            // User cancelled
             return .cancelled
         }
     }

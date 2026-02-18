@@ -122,6 +122,8 @@ extension DatabaseView {
         switch value {
         case .null:
             return "NULL"
+        case .undefined:
+            return "NULL"
         case .integer(let int):
             return "\(int)"
         case .smallint(let int):
@@ -132,6 +134,17 @@ extension DatabaseView {
             return "\(float)"
         case .text(let string):
             return "'\(string.replacingOccurrences(of: "'", with: "''"))'"
+        case .uuid(let uuid):
+            return "<UUID: \(uuid.uuidString)>"
+        case .data(let string):
+            return string
+        case .enumValue(let caseName):
+            // Try to parse as integer first
+            if let _ = Int(caseName) {
+                return caseName
+            } else {
+                return "'\(caseName.replacingOccurrences(of: "'", with: "''"))'"
+            }
         case .timestamp(let date):
             return "'\(date.ISO8601Format())'"
         case .array, .image:
@@ -143,6 +156,8 @@ extension DatabaseView {
         switch value {
         case .null:
             return "NULL"
+        case .undefined:
+            return ""
         case .integer(let int):
             return "\(int)"
         case .smallint(let int):
@@ -153,6 +168,12 @@ extension DatabaseView {
             return "\(float)"
         case .text(let string):
             return string
+        case .uuid(let uuid):
+            return uuid.uuidString
+        case .data(let string):
+            return string
+        case .enumValue(let caseName):
+            return ".\(caseName)"
         case .timestamp(let date):
             return date.ISO8601Format()
         case .array, .image:

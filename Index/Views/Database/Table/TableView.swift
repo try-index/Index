@@ -12,6 +12,7 @@ struct TableView: NSViewRepresentable {
     let records: [Record]
     let properties: [Property]
     let isReadOnly: Bool
+    let displayMode: DisplayMode
     let newRecordIds: Set<UUID>
     
     @Binding var selectedRecords: Set<UUID>
@@ -129,6 +130,7 @@ struct TableView: NSViewRepresentable {
         context.coordinator.records = records
         context.coordinator.properties = properties
         context.coordinator.isReadOnly = isReadOnly
+        context.coordinator.displayMode = displayMode
         context.coordinator.newRecordIds = newRecordIds
         context.coordinator.onUpdate = onUpdate
         context.coordinator.onForeignKeyClick = onForeignKeyClick
@@ -156,6 +158,7 @@ struct TableView: NSViewRepresentable {
             records: records,
             properties: properties,
             isReadOnly: isReadOnly,
+            displayMode: displayMode,
             newRecordIds: newRecordIds,
             selectedRecords: $selectedRecords,
             onUpdate: onUpdate,

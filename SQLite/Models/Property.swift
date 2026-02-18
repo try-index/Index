@@ -56,4 +56,17 @@ struct Property {
         self.type = column.datatype
         self.column = column
     }
+    
+    init(relationship: NSRelationshipDescription, column: SQLiteColumn) {
+        self.name = relationship.name
+        self.column = column
+        
+        // Format type based on destination entity and optionality
+        var typeString = relationship.destinationEntity?.name ?? "Unknown"
+        if relationship.isOptional {
+            typeString.append("?")
+        }
+        
+        self.type = typeString
+    }
 }

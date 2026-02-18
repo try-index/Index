@@ -13,6 +13,7 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
     let displayMode: DisplayMode
     
     @Binding var selection: T?
+    var onOpenInNewTab: ((T) -> Void)?
     
     @State private var dataObjects = [T]()
     @State private var error: SQLiteError? = nil
@@ -31,6 +32,13 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
                                     Spacer()
                                     Text("\(model.recordCount)")
                                 }
+                                .contextMenu {
+                                    Button("Open in New Tab") {
+                                        if let table = model as? T {
+                                            onOpenInNewTab?(table)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -43,6 +51,13 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
                                     Spacer()
                                     Text("\(entity.recordCount)")
                                 }
+                                .contextMenu {
+                                    Button("Open in New Tab") {
+                                        if let table = entity as? T {
+                                            onOpenInNewTab?(table)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -54,6 +69,11 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
                                     Label(dataObject.name, systemImage: "tablecells")
                                     Spacer()
                                     Text("\(dataObject.recordCount)")
+                                }
+                                .contextMenu {
+                                    Button("Open in New Tab") {
+                                        onOpenInNewTab?(dataObject)
+                                    }
                                 }
                             }
                         }

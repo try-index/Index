@@ -293,7 +293,7 @@ struct DatabasesView: View {
 
     private func openDatabase(url: URL, forceReadOnly: Bool) {
         // Add to databases manager first
-        databasesManager.addDatabase(from: url)
+        databasesManager.addDatabase(from: url, forceReadOnly: forceReadOnly)
 
         // Find the newly added database and open it
         if let database = databasesManager.recentDatabases.first(where: { $0.filePath == url.path }) {

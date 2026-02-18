@@ -38,7 +38,9 @@ struct Database: Identifiable, Codable, Hashable {
     let dateAdded: Date
     var lastOpened: Date
     var bookmark: Data?
+    var directoryBookmark: Data? // Optional: only created if user grants explicit directory access
     var groupId: UUID?
+    var forceReadOnly: Bool // Whether to always open this database in read-only mode
 
     init(
         id: UUID = UUID(),
@@ -47,7 +49,9 @@ struct Database: Identifiable, Codable, Hashable {
         dateAdded: Date = Date(),
         lastOpened: Date = Date(),
         bookmark: Data? = nil,
-        groupId: UUID? = nil
+        directoryBookmark: Data? = nil,
+        groupId: UUID? = nil,
+        forceReadOnly: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -55,7 +59,9 @@ struct Database: Identifiable, Codable, Hashable {
         self.dateAdded = dateAdded
         self.lastOpened = lastOpened
         self.bookmark = bookmark
+        self.directoryBookmark = directoryBookmark
         self.groupId = groupId
+        self.forceReadOnly = forceReadOnly
     }
 
     var displayName: String {

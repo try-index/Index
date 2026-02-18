@@ -3,7 +3,6 @@
 //  Index
 //
 //  Created by Axel Martinez on 6/3/25.
-//  Refactored to actor extension on 28/01/26.
 //
 
 import Foundation
@@ -42,15 +41,17 @@ extension SQLiteClient {
 
     func updateRecord(
         _ record: Record,
+        newRecord: Record,
         for columnName: String,
         from table: SQLiteTable
     ) async throws {
-        guard let value = record.values[columnName] else { return }
+        guard let value = newRecord.values[columnName] else { return }
 
         var update = try db
             .update(table.name)
             .set(columnName, to: sqlExpression(for: value))
 
+        // Use original record for WHERE clause so we match the row before the update
         if let whereExpression = buildWhereExpression(for: record, in: table) {
             update = update.where(whereExpression)
         }

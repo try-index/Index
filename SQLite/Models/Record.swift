@@ -14,43 +14,53 @@ struct Record: Identifiable, Equatable, Hashable {
     var rowId: Int?
     var values: [String: Value]
     
+    init(id: UUID = UUID(), rowId: Int? = nil, values: [String: Value]) {
+        self.id = id
+        self.rowId = rowId
+        self.values = values
+    }
+    
     init(_ row: any SQLRow, from columns: [SQLiteColumn]) throws {
         self.id = UUID()
         self.rowId = try? row.decode(column: "rowId", as: Int.self)
         self.values = [String: Value]()
         
         for column in columns {
-            switch column.datatype {
-            case "SMALLINT":
+            let datatype = column.datatype.uppercased()
+            
+            // Match datatype by prefix/contains to handle type specifications like VARCHAR(255)
+            if datatype.hasPrefix("SMALLINT") {
                 if let value = try? row.decode(column: column.name, as: Int16.self) {
                     values[column.name] = .smallint(value)
                 }
-            case "INTEGER":
+            } else if datatype.hasPrefix("INTEGER") || datatype.hasPrefix("INT") {
                 if let value = try? row.decode(column: column.name, as: Int.self) {
                     values[column.name] = .integer(value)
                 }
-            case "BIGINT", "FLOAT":
+            } else if datatype.hasPrefix("BIGINT") || datatype.hasPrefix("FLOAT") {
                 if let value = try? row.decode(column: column.name, as: Float.self) {
                     values[column.name] = .float(value)
                 }
-            case "TEXT", "VARCHAR", "NVARCHAR":
+            } else if datatype.hasPrefix("TEXT") || datatype.hasPrefix("VARCHAR") || 
+                      datatype.hasPrefix("NVARCHAR") || datatype.hasPrefix("CHAR") ||
+                      datatype.hasPrefix("CLOB") {
                 if let value = try? row.decode(column: column.name, as: String.self) {
-                    values[column.name] = .text("\"\(value)\"")
+                    values[column.name] = .text(value)
                 }
-            case "REAL":
+            } else if datatype.hasPrefix("REAL") || datatype.hasPrefix("DOUBLE") || 
+                      datatype.hasPrefix("NUMERIC") || datatype.hasPrefix("DECIMAL") {
                 if let value = try? row.decode(column: column.name, as: Double.self) {
                     values[column.name] = .real(value)
                 }
-            case "BLOB":
+            } else if datatype.hasPrefix("BLOB") {
                 if let data = try? row.decode(column: column.name, as: Data.self) {
                     values[column.name] = extractValue(from: data)
                 }
-            case "TIMESTAMP":
+            } else if datatype.hasPrefix("TIMESTAMP") || datatype.hasPrefix("DATETIME") || 
+                      datatype.hasPrefix("DATE") {
                 if let value = try? row.decode(column: column.name, as: Date.self) {
                     values[column.name] = .timestamp(value)
                 }
-            default:
-                break
             }
   
             if values[column.name] == nil {

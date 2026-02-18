@@ -91,8 +91,48 @@ extension SQLiteClient {
         tables: [String],
         tableName: String
     ) async throws -> T {
-        let tableColumns = try await getColumns(from: tableName)
+        var tableColumns = try await getColumns(from: tableName)
         let recordCount = try await getRecordCount(tableName)
+        
+        // Build a map of Core Data relationships for foreign key detection
+        var relationshipMap: [String: (destinationEntity: String, inverseRelationship: String?)] = [:]
+        for (relationshipName, relationship) in description.relationshipsByName {
+            if let destinationEntity = relationship.destinationEntity?.name {
+                relationshipMap[relationshipName] = (
+                    destinationEntity: destinationEntity,
+                    inverseRelationship: relationship.inverseRelationship?.name
+                )
+            }
+        }
+        
+        // Update columns with Core Data relationship information
+        tableColumns = tableColumns.map { column in
+            // Check if this column represents a relationship
+            var columnName = column.name.lowercased()
+            if columnName.hasPrefix("z") {
+                columnName.removeFirst()
+            }
+            
+            // Look for matching relationship
+            for (relationshipName, relationshipInfo) in relationshipMap {
+                if columnName == relationshipName.lowercased() {
+                    // Create a foreign key reference for this relationship
+                    let fk = SQLiteColumn.ForeignKey(
+                        table: relationshipInfo.destinationEntity,
+                        column: "Z_PK"
+                    )
+                    return SQLiteColumn(
+                        name: column.name,
+                        datatype: column.datatype,
+                        notNull: column.notNull,
+                        pk: column.pk,
+                        foreignKey: fk
+                    )
+                }
+            }
+            
+            return column
+        }
 
         var properties = [String: Property]()
 
@@ -106,6 +146,27 @@ extension SQLiteClient {
             }
 
             properties[attribute.value.name] = Property(attribute: attribute.value, column: column)
+        }
+        
+        // Add properties for relationships (as foreign key columns)
+        for (relationshipName, relationship) in description.relationshipsByName {
+            // Only add to-one relationships (not to-many)
+            guard !relationship.isToMany else { continue }
+            
+            // Find the column that represents this relationship
+            guard let column = tableColumns.first(where: {
+                var columnName = $0.name.lowercased()
+                if columnName.hasPrefix("z") {
+                    columnName.removeFirst()
+                }
+                return columnName == relationshipName.lowercased()
+            }) else {
+                continue
+            }
+            
+            // Create a property for this relationship column with formatted name
+            // Use the relationship description to get proper naming and type info
+            properties[relationshipName] = Property(relationship: relationship, column: column)
         }
 
         guard let name = description.name else {
@@ -137,6 +198,26 @@ extension SQLiteClient {
             .raw("PRAGMA table_info(\(SQLLiteral.string(tableName)));")
             .all()
 
+        // Fetch foreign key information
+        let foreignKeyRows = try await db
+            .raw("PRAGMA foreign_key_list(\(SQLLiteral.string(tableName)));")
+            .all()
+        
+        // Build a map of column name to foreign key info
+        var foreignKeys: [String: SQLiteColumn.ForeignKey] = [:]
+        
+        for fkRow in foreignKeyRows {
+            do {
+                let from = try fkRow.decode(column: "from", as: String.self)
+                let table = try fkRow.decode(column: "table", as: String.self)
+                let to = try fkRow.decode(column: "to", as: String.self)
+                
+                foreignKeys[from] = SQLiteColumn.ForeignKey(table: table, column: to)
+            } catch {
+                print("Can't decode foreign key for table \(tableName): \(error.localizedDescription)")
+            }
+        }
+
         return rows.compactMap { row in
             do {
                 let name = try row.decode(column: "name", as: String.self)
@@ -148,10 +229,12 @@ extension SQLiteClient {
                     name: name,
                     datatype: dataType,
                     notNull: notNull,
-                    pk: pk
+                    pk: pk,
+                    foreignKey: foreignKeys[name]
                 )
             } catch {
                 print("Can't decode table \(tableName): \(error.localizedDescription)")
+                
                 return nil
             }
         }

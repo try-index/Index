@@ -33,6 +33,11 @@ struct IndexApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        
+        // Settings window
+        Settings {
+            SettingsView()
+        }
 
         // Database windows - one per database
         WindowGroup(for: Database.ID.self) { $databaseId in

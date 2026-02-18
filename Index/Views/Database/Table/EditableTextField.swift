@@ -10,8 +10,13 @@ import AppKit
 // Custom text field that stores its value type for syntax coloring
 class EditableTextField: NSTextField {
     var valueType: Value = .null
+    var isForeignKey: Bool = false
+    var widthConstraint: NSLayoutConstraint?
+    
+    weak var foreignKeyButton: NSButton?
     
     var syntaxColor: NSColor {
+        // Color based on data type, not key type
         switch valueType {
         case .text:
             return NSColor(XcodeThemeColors.string)
@@ -24,16 +29,28 @@ class EditableTextField: NSTextField {
         }
     }
     
-    override func mouseDown(with event: NSEvent) {
-        self.textColor = syntaxColor
+    override func becomeFirstResponder() -> Bool {
+        let result = super.becomeFirstResponder()
         
-        super.mouseDown(with: event)
-    }
-    
-    override func keyDown(with event: NSEvent) {
-        // Handle keyboard entry (like pressing Enter or Return to edit)
-        self.textColor = syntaxColor
+        if result {
+            // Restore syntax color
+            self.textColor = syntaxColor
+            
+            // Clear placeholder
+            if self.stringValue == "NULL", case .null = valueType {
+                // Use async to ensure the field editor is set up
+                DispatchQueue.main.async {
+                    self.stringValue = ""
+                }
+            }
+            
+            // Hide foreign key button and deactivate width constraint when editing starts
+            if isForeignKey {
+                foreignKeyButton?.isHidden = true
+                widthConstraint?.isActive = false
+            }
+        }
         
-        super.keyDown(with: event)
+        return result
     }
 }

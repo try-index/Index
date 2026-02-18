@@ -17,6 +17,8 @@ extension TableView {
         var selectedRecords: Binding<Set<UUID>>
         var onUpdate: (UUID, String, Value) -> Void
         var onForeignKeyClick: ((SQLiteColumn.ForeignKey, Value, Record) -> Void)?
+        var onRowDeselected: ((UUID) -> Void)?
+        var onEnterPressed: ((UUID) -> Void)?
         
         weak var tableView: NSTableView?
         
@@ -27,8 +29,9 @@ extension TableView {
             newRecordIds: Set<UUID>,
             selectedRecords: Binding<Set<UUID>>,
             onUpdate: @escaping (UUID, String, Value) -> Void,
-            onForeignKeyClick: ((SQLiteColumn.ForeignKey, Value, Record
-                                ) -> Void)?) {
+            onForeignKeyClick: ((SQLiteColumn.ForeignKey, Value, Record) -> Void)?,
+            onRowDeselected: ((UUID) -> Void)?,
+            onEnterPressed: ((UUID) -> Void)?) {
             self.records = records
             self.properties = properties
             self.isReadOnly = isReadOnly
@@ -36,6 +39,8 @@ extension TableView {
             self.selectedRecords = selectedRecords
             self.onUpdate = onUpdate
             self.onForeignKeyClick = onForeignKeyClick
+            self.onRowDeselected = onRowDeselected
+            self.onEnterPressed = onEnterPressed
         }
         
         func numberOfRows(in tableView: NSTableView) -> Int {
@@ -83,52 +88,99 @@ extension TableView {
                 // Create a stack view for text + icon
                 let stackView = NSStackView()
                 stackView.orientation = .horizontal
-                stackView.spacing = 4
+                stackView.spacing = 2
                 stackView.alignment = .centerY
+                stackView.distribution = .fillProportionally
                 stackView.translatesAutoresizingMaskIntoConstraints = false
                 
-                // Text field (non-editable for foreign keys)
+                // Text field (editable for foreign keys, but styled differently)
                 let textField = EditableTextField()
                 textField.isBordered = false
                 textField.backgroundColor = .clear
                 textField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+                textField.translatesAutoresizingMaskIntoConstraints = false
+                textField.lineBreakMode = .byClipping
+                textField.usesSingleLineMode = true
+                textField.cell?.wraps = false
+                textField.cell?.isScrollable = true
                 
                 let stringValue = valueToString(value)
                 
                 textField.stringValue = stringValue
                 textField.drawsBackground = false
                 textField.valueType = value
-                textField.isEditable = false
-                textField.isSelectable = false
-                textField.textColor = .systemBlue
+                textField.isForeignKey = true // Mark as foreign key for button/width handling
+                
+                // Make editable if not read-only
+                if !isReadOnly {
+                    textField.isEditable = true
+                    textField.delegate = self
+                    textField.allowsEditingTextAttributes = false
+                    textField.importsGraphics = false
+                    
+                    // Store metadata for editing
+                    textField.identifier = NSUserInterfaceItemIdentifier("\(record.id.uuidString)|\(property.column.name)")
+                } else {
+                    textField.isEditable = false
+                    textField.isSelectable = false
+                }
                 
                 // Arrow button
                 let button = NSButton()
-                button.image = NSImage(systemSymbolName: "arrow.right.circle", accessibilityDescription: nil)
+                let buttonImage = NSImage(systemSymbolName: "arrow.right.circle", accessibilityDescription: nil)
+                if let image = buttonImage?.withSymbolConfiguration(.init(pointSize: 12, weight: .regular)) {
+                    button.image = image
+                }
                 button.bezelStyle = .inline
                 button.isBordered = false
                 button.imageScaling = .scaleProportionallyDown
+                button.imagePosition = .imageOnly
                 button.target = self
                 button.action = #selector(foreignKeyButtonClicked(_:))
                 button.tag = row
                 button.identifier = NSUserInterfaceItemIdentifier(property.column.name)
+                button.translatesAutoresizingMaskIntoConstraints = false
+                button.contentTintColor = .systemBlue
                 
-                if let image = button.image {
-                    button.image = image.withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
-                }
+                // Calculate preferred width based on text content
+                let textWidth = (stringValue as NSString).size(withAttributes: [
+                    .font: textField.font ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+                ]).width
+                let preferredWidth = max(textWidth + 5, 15)
+                
+                // Create width constraint for text field
+                let textFieldWidthConstraint = textField.widthAnchor.constraint(equalToConstant: preferredWidth)
+                textFieldWidthConstraint.priority = .defaultHigh
+                textFieldWidthConstraint.isActive = true
+                
+                // Store constraint reference so it can be toggled during editing
+                textField.widthConstraint = textFieldWidthConstraint
                 
                 stackView.addArrangedSubview(textField)
                 stackView.addArrangedSubview(button)
                 
                 cellView.addSubview(stackView)
                 
+                // Set priorities - button stays fixed, text field can grow if needed
+                textField.setContentHuggingPriority(.init(249), for: .horizontal)
+                textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                
+                button.setContentHuggingPriority(.required, for: .horizontal)
+                button.setContentCompressionResistancePriority(.required, for: .horizontal)
+                
                 NSLayoutConstraint.activate([
                     stackView.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: leadingConstant),
                     stackView.trailingAnchor.constraint(lessThanOrEqualTo: cellView.trailingAnchor, constant: -4),
-                    stackView.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+                    stackView.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                    button.widthAnchor.constraint(equalToConstant: 16),
+                    button.heightAnchor.constraint(equalToConstant: 16)
                 ])
                 
+                // Important: Set the textField property so updateColors() works
                 cellView.textField = textField
+                
+                // Store button reference in textField so we can hide/show it during editing
+                textField.foreignKeyButton = button
             } else {
                 let textField = EditableTextField()
                 textField.isBordered = false
@@ -179,9 +231,20 @@ extension TableView {
                 index < records.count ? records[index].id : nil
             })
             
+            // Get previously selected records
+            let previousSelection = self.selectedRecords.wrappedValue
+            
+            // Find records that were deselected
+            let deselectedRecords = previousSelection.subtracting(newSelection)
+            
             // Defer state change to avoid modifying state during view update
             DispatchQueue.main.async {
                 self.selectedRecords.wrappedValue = newSelection
+                
+                // Notify row deselected (user clicked away from the row)
+                for deselectedId in deselectedRecords {
+                    self.onRowDeselected?(deselectedId)
+                }
             }
         }
         
@@ -200,11 +263,44 @@ extension TableView {
             callback(fk, value, records[row])
         }
         
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            // Clear NULL placeholder when user starts editing an empty field
+            guard let textField = obj.object as? EditableTextField else {
+                return
+            }
+            
+            // If the field contains "NULL" and has null value type, clear it
+            if textField.stringValue == "NULL", case .null = textField.valueType {
+                textField.stringValue = ""
+            }
+        }
+        
+
         func controlTextDidEndEditing(_ obj: Notification) {
             // Restore transparent background when editing ends
             if let textField = obj.object as? EditableTextField {
                 textField.drawsBackground = false
                 textField.backgroundColor = .clear
+                
+                // For foreign key fields, update constraint BEFORE showing button
+                if textField.isForeignKey {
+                    // Recalculate and update width constraint based on new text
+                    if let widthConstraint = textField.widthConstraint {
+                        let newTextWidth = (textField.stringValue as NSString).size(withAttributes: [
+                            .font: textField.font ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+                        ]).width
+                        let newPreferredWidth = max(newTextWidth + 5, 15)
+                        
+                        widthConstraint.constant = newPreferredWidth
+                        widthConstraint.isActive = true
+                        
+                        // Force layout update before showing button
+                        textField.superview?.layoutSubtreeIfNeeded()
+                    }
+                    
+                    // Now show the button after layout is complete
+                    textField.foreignKeyButton?.isHidden = false
+                }
                 
                 // Update colors based on selection state
                 if let cellView = textField.superview as? TableCell {
@@ -232,6 +328,13 @@ extension TableView {
             // Convert text to appropriate value type
             if let newValue = stringToValue(newText, originalValue: value) {
                 onUpdate(recordId, columnName, newValue)
+            }
+            
+            // Check if user pressed Return/Enter - this ends editing but keeps selection
+            // We detect this by checking the movement type
+            if let movement = obj.userInfo?["NSTextMovement"] as? Int,
+               movement == NSReturnTextMovement {
+                onEnterPressed?(recordId)
             }
         }
         

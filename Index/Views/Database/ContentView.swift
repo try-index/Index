@@ -19,6 +19,7 @@ struct ContentView<T: SQLiteTable>: View {
     @State private var properties = [Property]()
     @State private var records = [Record]()
     @State private var newRecords = [Record]() // Temporary unsaved records
+    @State private var editingRecordId: UUID? // Track which record is being edited
     @State private var error: SQLiteError? = nil
     @State private var showAlert = false
     @State private var showDeleteConfirmation = false
@@ -37,8 +38,8 @@ struct ContentView<T: SQLiteTable>: View {
     var isReadOnly: Bool = false
 
     var filteredRecords: [Record] {
-        // Combine new records with existing records
-        let allRecords = newRecords + records
+        // Combine new records with existing records (new records at the bottom)
+        let allRecords = records + newRecords
         
         return allRecords.filter({ record in
             // Apply column filter if specified
@@ -70,7 +71,7 @@ struct ContentView<T: SQLiteTable>: View {
                         .allowsHitTesting(false)
                     ProgressView()
                 }
-            } else if records.isEmpty {
+            } else if records.isEmpty && newRecords.isEmpty {
                 ZStack {
                     Color.clear
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -85,12 +86,26 @@ struct ContentView<T: SQLiteTable>: View {
                         isReadOnly: isReadOnly,
                         newRecordIds: Set(newRecords.map { $0.id }),
                         selectedRecords: $selectedRecords,
+                        scrollToRecordId: editingRecordId,
                         onUpdate: { recordId, columnName, newValue in
                             updateRecord(id: recordId, columnName: columnName, to: newValue)
                         },
                         onForeignKeyClick: onOpenRelatedTable != nil ? { fk, value, record in
                             handleForeignKeyClick(foreignKey: fk, value: value, callback: onOpenRelatedTable!)
-                        } : nil
+                        } : nil,
+                        onRowDeselected: { recordId in
+                            // Only validate when the entire row is deselected (user clicked away)
+                            if newRecords.contains(where: { $0.id == recordId }) {
+                                validateAndSaveOrRemoveRecord(recordId)
+                            }
+                            editingRecordId = nil
+                        },
+                        onEnterPressed: { recordId in
+                            // Save record when user presses enter
+                            if newRecords.contains(where: { $0.id == recordId }) {
+                                validateAndSaveOrRemoveRecord(recordId)
+                            }
+                        }
                     )
                     
                     StatusBar(
@@ -150,6 +165,16 @@ struct ContentView<T: SQLiteTable>: View {
             Text("Are you sure you want to delete \(selectedRecords.count) record(s)? This action cannot be undone.")
         }
         .onKeyPress { event in
+            // Check for Escape key to cancel new record creation
+            if event.key == .escape, let editingId = editingRecordId, 
+               newRecords.contains(where: { $0.id == editingId }) {
+                // Remove the new record being edited
+                newRecords.removeAll { $0.id == editingId }
+                selectedRecords.remove(editingId)
+                editingRecordId = nil
+                return .handled
+            }
+            
             // Check for Command+S to save new records (only in editable mode)
             if event.key == "s" && event.modifiers.contains(.command) && !isReadOnly && !newRecords.isEmpty {
                 saveNewRecords()
@@ -315,10 +340,85 @@ struct ContentView<T: SQLiteTable>: View {
         
         let newRecord = Record(id: UUID(), values: values)
         
-        newRecords.insert(newRecord, at: 0) // Insert at the beginning
+        newRecords.append(newRecord) // Insert at the end
         
-        // Select the new record
+        // Select the new record and mark it as being edited
         selectedRecords = [newRecord.id]
+        editingRecordId = newRecord.id
+    }
+    
+    func validateAndSaveOrRemoveRecord(_ recordId: UUID) {
+        guard let record = newRecords.first(where: { $0.id == recordId }) else {
+            return
+        }
+        
+        // Check if all required (NOT NULL) fields are filled
+        var allRequiredFieldsFilled = true
+        
+        for property in properties {
+            // Skip auto-increment primary keys
+            if property.column.pk > 0 {
+                // Check if this is an auto-increment column by seeing if it's INTEGER PRIMARY KEY
+                let isAutoIncrement = property.column.datatype.uppercased().contains("INTEGER") && 
+                                    property.column.pk > 0
+                if isAutoIncrement {
+                    continue
+                }
+            }
+            
+            if property.column.notNull {
+                if let value = record.values[property.column.name] {
+                    switch value {
+                    case .null:
+                        allRequiredFieldsFilled = false
+                    case .text(let str) where str.isEmpty:
+                        allRequiredFieldsFilled = false
+                    default:
+                        break
+                    }
+                } else {
+                    allRequiredFieldsFilled = false
+                }
+            }
+        }
+        
+        if allRequiredFieldsFilled {
+            // Save the record
+            saveSpecificRecord(recordId)
+        } else {
+            // Remove the record
+            newRecords.removeAll { $0.id == recordId }
+            selectedRecords.remove(recordId)
+        }
+    }
+    
+    func saveSpecificRecord(_ recordId: UUID) {
+        guard let record = newRecords.first(where: { $0.id == recordId }) else {
+            return
+        }
+        
+        Task {
+            do {
+                try await client.addRecord(record, to: dataObject)
+                
+                await MainActor.run {
+                    // Remove from new records
+                    newRecords.removeAll { $0.id == recordId }
+                    
+                    // Refresh to show saved record
+                    refreshRecords()
+                }
+            } catch {
+                if let sqlError = error as? SQLiteError {
+                    await MainActor.run {
+                        self.error = sqlError
+                        self.showAlert = true
+                        
+                        // Keep the record in newRecords so user can fix it
+                    }
+                }
+            }
+        }
     }
     
     func saveNewRecords() {

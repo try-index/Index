@@ -21,7 +21,7 @@ struct StatusBar: View {
 
             // Record count
             HStack(spacing: 4) {
-                Text("\(filteredCount) of \(recordCount) records")
+                Text("\(recordCount) records")
                     .font(.system(size: 11))
             }
             .foregroundStyle(.secondary)

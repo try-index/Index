@@ -16,8 +16,11 @@ struct TableView: NSViewRepresentable {
     
     @Binding var selectedRecords: Set<UUID>
     
+    let scrollToRecordId: UUID?
     let onUpdate: (UUID, String, Value) -> Void
     let onForeignKeyClick: ((SQLiteColumn.ForeignKey, Value, Record) -> Void)?
+    let onRowDeselected: ((UUID) -> Void)?
+    let onEnterPressed: ((UUID) -> Void)?
     
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -83,7 +86,7 @@ struct TableView: NSViewRepresentable {
                 keyAttr.addAttribute(.foregroundColor, value: NSColor.systemYellow, range: NSRange(location: 0, length: keyAttr.length))
                 keyAttr.addAttribute(.baselineOffset, value: 0, range: NSRange(location: 0, length: keyAttr.length))
                 
-                headerText.append(NSAttributedString(string: " "))
+                headerText.append(NSAttributedString(string: "  "))
                 headerText.append(keyAttr)
             }
             
@@ -100,7 +103,7 @@ struct TableView: NSViewRepresentable {
                 linkAttr.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: NSRange(location: 0, length: linkAttr.length))
                 linkAttr.addAttribute(.baselineOffset, value: 0, range: NSRange(location: 0, length: linkAttr.length))
                 
-                headerText.append(NSAttributedString(string: " "))
+                headerText.append(NSAttributedString(string: "  "))
                 headerText.append(linkAttr)
             }
             
@@ -129,6 +132,8 @@ struct TableView: NSViewRepresentable {
         context.coordinator.newRecordIds = newRecordIds
         context.coordinator.onUpdate = onUpdate
         context.coordinator.onForeignKeyClick = onForeignKeyClick
+        context.coordinator.onRowDeselected = onRowDeselected
+        context.coordinator.onEnterPressed = onEnterPressed
         
         tableView.reloadData()
         
@@ -138,6 +143,12 @@ struct TableView: NSViewRepresentable {
         })
         
         tableView.selectRowIndexes(selectedIndexes, byExtendingSelection: false)
+        
+        // Scroll to record if specified
+        if let scrollToId = scrollToRecordId,
+           let index = records.firstIndex(where: { $0.id == scrollToId }) {
+            tableView.scrollRowToVisible(index)
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -148,7 +159,9 @@ struct TableView: NSViewRepresentable {
             newRecordIds: newRecordIds,
             selectedRecords: $selectedRecords,
             onUpdate: onUpdate,
-            onForeignKeyClick: onForeignKeyClick
+            onForeignKeyClick: onForeignKeyClick,
+            onRowDeselected: onRowDeselected,
+            onEnterPressed: onEnterPressed
         )
     }
 }

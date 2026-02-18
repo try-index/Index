@@ -6,7 +6,7 @@
 Index is a powerful, intuitive database client application designed exclusively for macOS, providing developers with a comprehensive tool for editing and exploring databases used on app development.
 
 <p align="center">
-  <a href="https://testflight.apple.com/join/cFzQ6T3X">
+  <a href="https://apps.apple.com/es/app/index-db-client/id6758145306?l=en-GB&mt=12">
       <img src="https://github.com/try-index/Index/blob/main/.github/store_badge.svg">
   </a>
 </p>

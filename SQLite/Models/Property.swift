@@ -73,20 +73,15 @@ struct Property {
                     if let enumName = className.split(separator: ".").last {
                         let enumNameStr = String(enumName)
                         // NSDictionary is the storage type for composite enums, use generic "Enum" label
-                        if enumNameStr == "NSDictionary" {
-                            typeString = "Enum"
-                        } else {
-                            typeString = enumNameStr
-                        }
+                        typeString = enumNameStr
                     } else {
-                        typeString = className == "NSDictionary" ? "Enum" : className
+                        typeString = className
                     }
-                } else {
-                    typeString = "Enum"
                 }
+                
                 attributeType = .composite
             default:
-                typeString = "String"
+                typeString = "Unknown"
             }
         }
       

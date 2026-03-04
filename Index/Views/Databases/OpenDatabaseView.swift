@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 struct OpenDatabaseView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let onFileSelected: (URL, Bool) -> Void
+    let onFileSelected: (URL, Bool, Bool) -> Void  // (url, readOnly, ignoreDataModel)
     let onBrowseSimulators: () -> Void
 
     var body: some View {
@@ -99,13 +99,53 @@ struct OpenDatabaseView: View {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
 
-        let checkbox = NSButton(checkboxWithTitle: "Open as Read-Only", target: nil, action: nil)
-        checkbox.state = .off
-        panel.accessoryView = checkbox
+        let readOnlyCheckbox = NSButton(checkboxWithTitle: "Open Read-Only", target: nil, action: nil)
+        readOnlyCheckbox.state = .off
+        
+        let rawSQLCheckbox = NSButton(checkboxWithTitle: "Open as SQLite database", target: nil, action: nil)
+        rawSQLCheckbox.state = .off
+        
+        let stackView = NSStackView(views: [readOnlyCheckbox, rawSQLCheckbox])
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 6
+        
+        // Wrap in a container with padding
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(stackView)
+        
+        NSLayoutConstraint.activate([
+            stackView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            stackView.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
+            stackView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12)
+        ])
+        
+        panel.accessoryView = container
+        panel.isAccessoryViewDisclosed = true
+        
+        // Hide the disclosure "Options" button
+        DispatchQueue.main.async {
+            if let contentView = panel.contentView {
+                Self.hideDisclosureButton(in: contentView)
+            }
+        }
 
         if panel.runModal() == .OK, let url = panel.url {
             dismiss()
-            onFileSelected(url, checkbox.state == .on)
+            onFileSelected(url, readOnlyCheckbox.state == .on, rawSQLCheckbox.state == .on)
+        }
+    }
+    
+    private static func hideDisclosureButton(in view: NSView) {
+        for subview in view.subviews {
+            if let button = subview as? NSButton,
+               button.bezelStyle == .disclosure {
+                button.isHidden = true
+                return
+            }
+            hideDisclosureButton(in: subview)
         }
     }
 }

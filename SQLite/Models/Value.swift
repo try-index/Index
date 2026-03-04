@@ -22,4 +22,9 @@ public enum Value: Hashable {
     case timestamp(Date)
     case null  // Explicit NULL value in database
     case undefined  // Value not present (virtual columns, relationships)
+    
+    var isNull: Bool {
+        if case .null = self { return true }
+        return false
+    }
 }

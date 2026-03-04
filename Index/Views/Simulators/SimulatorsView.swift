@@ -24,6 +24,7 @@ struct SimulatorsView: View {
     @State private var selectedSimulatorURL: URL?
     @State private var selectedFileInfo: FileInfo?
     @State private var openAsReadOnly = false
+    @State private var openAsSQLite = false
     
     var userDirectory: URL? {
         if let userDirectory = FileManager.default.urls(for: .userDirectory, in: .localDomainMask).first {
@@ -63,8 +64,8 @@ struct SimulatorsView: View {
             if let selectedSimulatorURL {
                 SimulatorFilesView(
                     selectedFileInfo: $selectedFileInfo,
-                    openFile: { fileInfo, forceReadOnly in
-                        try await openFile(fileInfo: fileInfo, forceReadOnly: forceReadOnly)
+                    openFile: { fileInfo, readOnly, ignoreDataModel in
+                        try await openFile(fileInfo: fileInfo, readOnly: readOnly, ignoreDataModel: ignoreDataModel)
                     },
                     simulatorURL: selectedSimulatorURL
                 )
@@ -85,8 +86,12 @@ struct SimulatorsView: View {
             }
 
             ToolbarItem(placement: .principal) {
-                Toggle("Open as Read-Only", isOn: $openAsReadOnly)
-                    .toggleStyle(.checkbox)
+                HStack(spacing: 16) {
+                    Toggle("Open Read-Only", isOn: $openAsReadOnly)
+                        .toggleStyle(.checkbox)
+                    Toggle("Open as SQLite database", isOn: $openAsSQLite)
+                        .toggleStyle(.checkbox)
+                }
             }
 
             ToolbarItem(placement: .confirmationAction) {
@@ -94,7 +99,7 @@ struct SimulatorsView: View {
                     if let selectedFileInfo {
                         Task(priority: .userInitiated) {
                             do {
-                                try await self.openFile(fileInfo: selectedFileInfo, forceReadOnly: openAsReadOnly)
+                                try await self.openFile(fileInfo: selectedFileInfo, readOnly: openAsReadOnly, ignoreDataModel: openAsSQLite)
                             } catch {
                                 fatalError(error.localizedDescription)
                             }
@@ -167,9 +172,9 @@ struct SimulatorsView: View {
         }
     }
     
-    func openFile(fileInfo: FileInfo, forceReadOnly: Bool = false) async throws {
+    func openFile(fileInfo: FileInfo, readOnly: Bool = false, ignoreDataModel: Bool = false) async throws {
         // Add to recent databases
-        databasesManager.addDatabase(from: fileInfo.url)
+        databasesManager.addDatabase(from: fileInfo.url, ignoreDataModel: ignoreDataModel)
 
         // Find the newly added database
         if let database = databasesManager.recentDatabases.first(where: { $0.filePath == fileInfo.url.path }) {

@@ -12,26 +12,29 @@ import SwiftUI
 struct ContentView<T: SQLiteTable>: View {
     let client: SQLiteClient
 
-    @Binding var searchText: String
+    @State var records = [Record]()
+    @State var selectedRecords = Set<UUID>()
+    @State var newRecords = [Record]() // Temporary unsaved records
+    @State var editingRecordId: UUID? // Track which record is being edited
+    @State var error: SQLiteError? = nil
+    @State var showAlert = false
+    @State var properties = [Property]()
+    @State var showDeleteConfirmation = false
 
     @State private var isLoading = false
-    @State private var selectedRecords = Set<UUID>()
-    @State private var properties = [Property]()
-    @State private var records = [Record]()
-    @State private var newRecords = [Record]() // Temporary unsaved records
-    @State private var editingRecordId: UUID? // Track which record is being edited
-    @State private var error: SQLiteError? = nil
-    @State private var showAlert = false
-    @State private var showDeleteConfirmation = false
 
     let tableFont: NSFont = .monospacedSystemFont(ofSize: 13, weight: .regular)
 
     var dataObject: T
-    var refresh: PassthroughSubject<Void, Never>
+    var refreshPublisher: PassthroughSubject<Void, Never>
+    var addRecordPublisher: PassthroughSubject<Void, Never>
+    var deleteRecordsPublisher: PassthroughSubject<Void, Never>
+    var saveRecordsPublisher: PassthroughSubject<Void, Never>
     var filterColumn: String?
     var filterValue: Value?
     var onOpenRelatedTable: ((T, String, Value) -> Void)?
     
+    @Binding var searchText: String
     @Binding var isUtilityExpanded: Bool
     @Binding var selectedRecordsCount: Int
     
@@ -100,6 +103,7 @@ struct ContentView<T: SQLiteTable>: View {
                             if newRecords.contains(where: { $0.id == recordId }) {
                                 validateAndSaveOrRemoveRecord(recordId)
                             }
+                            
                             editingRecordId = nil
                         },
                         onEnterPressed: { recordId in
@@ -116,6 +120,7 @@ struct ContentView<T: SQLiteTable>: View {
                         tableName: (dataObject as? Entity)?.displayName ?? dataObject.name,
                         unsavedCount: newRecords.count,
                         isReadOnly: isReadOnly,
+                        saveRecords: saveRecordsPublisher,
                         isUtilityExpanded: $isUtilityExpanded
                     )
                 }
@@ -123,17 +128,17 @@ struct ContentView<T: SQLiteTable>: View {
         }
         .onAppear(perform: refreshRecords)
         .onChange(of: dataObject, refreshRecords)
-        .onReceive(refresh, perform: refreshRecords)
+        .onReceive(refreshPublisher, perform: refreshRecords)
         .onChange(of: selectedRecords) { _, newValue in
             selectedRecordsCount = newValue.count
         }
-        .onReceive(NotificationCenter.default.publisher(for: .deleteRecordsRequested)) { _ in
+        .onReceive(deleteRecordsPublisher) { _ in
             confirmDeleteRecords()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .addRecordRequested)) { _ in
+        .onReceive(addRecordPublisher) { _ in
             addEmptyRecord()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .saveRecordsRequested)) { _ in
+        .onReceive(saveRecordsPublisher) { _ in
             saveNewRecords()
         }
         .alert(isPresented: $showAlert, error: error) { _ in
@@ -161,7 +166,7 @@ struct ContentView<T: SQLiteTable>: View {
         .alert("Delete Records", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                removeRecords()
+                deleteRecords()
             }
         } message: {
             Text("Are you sure you want to delete \(selectedRecords.count) record(s)? This action cannot be undone.")
@@ -229,238 +234,6 @@ struct ContentView<T: SQLiteTable>: View {
         }
     }
 
-    func confirmDeleteRecords() {
-        guard !selectedRecords.isEmpty else {
-            return
-        }
-        
-        showDeleteConfirmation = true
-    }
-    
-    func removeRecords() {
-        guard !selectedRecords.isEmpty else {
-            return
-        }
-
-        // Check if any selected records are new (unsaved)
-        let newRecordsToDelete = newRecords.filter { selectedRecords.contains($0.id) }
-        let existingRecordsToDelete = records.filter { selectedRecords.contains($0.id) }
-        
-        // Remove new records immediately (they're not in the database)
-        if !newRecordsToDelete.isEmpty {
-            newRecords.removeAll { selectedRecords.contains($0.id) }
-        }
-        
-        // Delete existing records from database
-        if !existingRecordsToDelete.isEmpty {
-            Task(priority: .userInitiated) {
-                do {
-                    // Delete records from the database
-                    try await client.deleteRecords(existingRecordsToDelete, from: dataObject)
-
-                    await MainActor.run {
-                        // Remove the records from the local array
-                        records.removeAll { selectedRecords.contains($0.id) }
-
-                        // Clear selection
-                        selectedRecords.removeAll()
-                    }
-                } catch let error as SQLiteError {
-                    await MainActor.run {
-                        self.error = error
-                        self.showAlert = true
-                    }
-                }
-            }
-        } else {
-            // If only new records were deleted, clear selection immediately
-            selectedRecords.removeAll()
-        }
-    }
-
-    func updateRecord(id: UUID, columnName: String, to newValue: Value) {
-        // Check if this is a new record first
-        if let newIndex = newRecords.firstIndex(where: { $0.id == id }) {
-            // Update the new record locally only - don't save to database
-            newRecords[newIndex].values[columnName] = newValue
-            
-            return
-        }
-        
-        // Handle existing record update
-        guard let index = records.firstIndex(where: { $0.id == id }) else {
-            return
-        }
-        
-        // Keep the original record with old values for WHERE clause
-        let record = records[index]
-        var newRecord = record
-        
-        let oldValue = record.values[columnName]
-        
-        Task {
-            // Optimistically update the UI
-            await MainActor.run {
-                records[index].values[columnName] = newValue
-            }
-            
-            // Update the value in the record
-            newRecord.values[columnName] = newValue
-
-            // Update in database - use originalRecord for WHERE clause, updatedRecord for SET
-            do {
-                try await client.updateRecord(
-                    record,
-                    newRecord: newRecord,
-                    for: columnName,
-                    from: dataObject
-                )
-            } catch let error as SQLiteError {
-                // Revert the optimistic update on error
-                await MainActor.run {
-                    records[index].values[columnName] = oldValue
-                    self.error = error
-                    self.showAlert = true
-                }
-            } catch {
-                // Revert the optimistic update on any other error
-                await MainActor.run {
-                    records[index].values[columnName] = oldValue
-                    print("Failed to update record: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-    
-    func addEmptyRecord() {
-        // Create a new record with null values for all columns
-        var values: [String: Value] = [:]
-        
-        for property in properties {
-            values[property.column.name] = .null
-        }
-        
-        let newRecord = Record(id: UUID(), values: values)
-        
-        newRecords.append(newRecord) // Insert at the end
-        
-        // Select the new record and mark it as being edited
-        selectedRecords = [newRecord.id]
-        editingRecordId = newRecord.id
-    }
-    
-    func validateAndSaveOrRemoveRecord(_ recordId: UUID) {
-        guard let record = newRecords.first(where: { $0.id == recordId }) else {
-            return
-        }
-        
-        // Check if all required (NOT NULL) fields are filled
-        var allRequiredFieldsFilled = true
-        
-        for property in properties {
-            // Skip auto-increment primary keys
-            if property.column.pk > 0 {
-                // Check if this is an auto-increment column by seeing if it's INTEGER PRIMARY KEY
-                let isAutoIncrement = property.column.datatype.uppercased().contains("INTEGER") && 
-                                    property.column.pk > 0
-                if isAutoIncrement {
-                    continue
-                }
-            }
-            
-            if property.column.notNull {
-                if let value = record.values[property.column.name] {
-                    switch value {
-                    case .null, .undefined:
-                        allRequiredFieldsFilled = false
-                    case .text(let str) where str.isEmpty:
-                        allRequiredFieldsFilled = false
-                    default:
-                        break
-                    }
-                } else {
-                    allRequiredFieldsFilled = false
-                }
-            }
-        }
-        
-        if allRequiredFieldsFilled {
-            // Save the record
-            saveSpecificRecord(recordId)
-        } else {
-            // Remove the record
-            newRecords.removeAll { $0.id == recordId }
-            selectedRecords.remove(recordId)
-        }
-    }
-    
-    func saveSpecificRecord(_ recordId: UUID) {
-        guard let record = newRecords.first(where: { $0.id == recordId }) else {
-            return
-        }
-        
-        Task {
-            do {
-                try await client.addRecord(record, to: dataObject)
-                
-                await MainActor.run {
-                    // Remove from new records
-                    newRecords.removeAll { $0.id == recordId }
-                    
-                    // Refresh to show saved record
-                    refreshRecords()
-                }
-            } catch {
-                if let sqlError = error as? SQLiteError {
-                    await MainActor.run {
-                        self.error = sqlError
-                        self.showAlert = true
-                        
-                        // Keep the record in newRecords so user can fix it
-                    }
-                }
-            }
-        }
-    }
-    
-    func saveNewRecords() {
-        guard !newRecords.isEmpty else {
-            return
-        }
-        
-        Task {
-            var savedCount = 0
-            var failedCount = 0
-            
-            for record in newRecords {
-                do {
-                    try await client.addRecord(record, to: dataObject)
-                    
-                    savedCount += 1
-                } catch {
-                    failedCount += 1
-                    
-                    if let sqlError = error as? SQLiteError {
-                        await MainActor.run {
-                            self.error = sqlError
-                            self.showAlert = true
-                        }
-                    }
-                }
-            }
-            
-            await MainActor.run {
-                // Clear all new records after attempting to save
-                newRecords.removeAll()
-                
-                // Refresh to show saved records
-                if savedCount > 0 {
-                    refreshRecords()
-                }
-            }
-        }
-    }
-    
     private func valueToString(_ value: Value) -> String {
         switch value {
         case .null:
@@ -531,6 +304,9 @@ struct ContentView<T: SQLiteTable>: View {
 #Preview {
     @Previewable @State var searchText: String = ""
     @Previewable @State var refresh: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var addRecord: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var deleteRecords: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var saveRecords: PassthroughSubject<Void, Never> = .init()
     @Previewable @State var isUtilityExpanded = false
     @Previewable @State var selectedRecordsCount = 0
 
@@ -538,9 +314,12 @@ struct ContentView<T: SQLiteTable>: View {
 
     ContentView(
         client: SQLiteClient(),
-        searchText: $searchText,
         dataObject: table,
-        refresh: refresh,
+        refreshPublisher: refresh,
+        addRecordPublisher: addRecord,
+        deleteRecordsPublisher: deleteRecords,
+        saveRecordsPublisher: saveRecords,
+        searchText: $searchText,
         isUtilityExpanded: $isUtilityExpanded,
         selectedRecordsCount: $selectedRecordsCount
     )

@@ -44,6 +44,15 @@ struct DatabaseRow: View {
             Spacer()
 
             HStack(spacing: 8) {
+                if database.readOnly {
+                    Text("READ ONLY")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary)
+                        .clipShape(Capsule())
+                }
                 ZStack {
                     Text(lastOpenedText)
                         .font(.system(size: 11))

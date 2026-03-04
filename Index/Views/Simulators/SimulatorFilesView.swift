@@ -16,7 +16,7 @@ struct SimulatorFilesView: View {
     @State private var isLoading: Bool = false
     @State private var applications: [AppInfo] = []
 
-    let openFile: (FileInfo, Bool) async throws -> Void
+    let openFile: (FileInfo, Bool, Bool) async throws -> Void  // (fileInfo, readOnly, ignoreDataModel)
     let simulatorURL: URL
 
     var body: some View {
@@ -41,7 +41,7 @@ struct SimulatorFilesView: View {
                 .contextMenu(forSelectionType: FileInfo.self, menu: { _ in }) { fileSet in
                     if let file = fileSet.first {
                         Task(priority: .userInitiated) {
-                            try? await self.openFile(file, false)
+                            try? await self.openFile(file, false, false)
                         }
                     }
                 }

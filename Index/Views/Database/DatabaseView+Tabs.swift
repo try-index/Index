@@ -28,7 +28,8 @@ extension DatabaseView {
         
         if let filterColumn = filterColumn, let filterValue = filterValue {
             let valueString = formatValueForDisplay(filterValue)
-            title += " (\(filterColumn) = \(valueString))"
+            let displayColumn = formatColumnForDisplay(filterColumn, table: table)
+            title += " (\(displayColumn) = \(valueString))"
         }
         
         let newTab = TabItem(
@@ -104,6 +105,21 @@ extension DatabaseView {
     func openRelatedTable(table: T, column: String, value: Value) {
         // Always open foreign key links in a new tab
         openTab(for: table, filterColumn: column, filterValue: value, forceNewTab: true)
+    }
+    
+    private func formatColumnForDisplay(_ column: String, table: T) -> String {
+        // For CoreData/SwiftData entities, try to find the property name that matches this column
+        if table is Entity {
+            // Z_PK is the internal primary key for CoreData/SwiftData
+            if column == "Z_PK" {
+                return "id"
+            }
+            if let entity = table as? Entity,
+               let property = entity.properties.values.first(where: { $0.column.name == column }) {
+                return property.name
+            }
+        }
+        return column
     }
     
     private func generateSQLQuery(for table: T, filterColumn: String?, filterValue: Value?) -> String {

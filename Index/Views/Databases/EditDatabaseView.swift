@@ -13,6 +13,7 @@ struct EditDatabaseView: View {
     let onCancel: () -> Void
 
     @State private var displayName: String
+    @State private var readOnly: Bool
 
     init(database: Database, onSave: @escaping (Database) -> Void, onCancel: @escaping () -> Void) {
         self.database = database
@@ -20,6 +21,7 @@ struct EditDatabaseView: View {
         self.onCancel = onCancel
         
         self._displayName = State(initialValue: database.name)
+        self._readOnly = State(initialValue: database.readOnly)
     }
 
     var body: some View {
@@ -38,6 +40,8 @@ struct EditDatabaseView: View {
                     Text(database.lastOpened, format: .dateTime.month().day().year().hour().minute())
                         .foregroundStyle(.secondary)
                 }
+
+                Toggle("Read-Only", isOn: $readOnly)
             }
             .formStyle(.grouped)
             .padding()
@@ -58,6 +62,7 @@ struct EditDatabaseView: View {
                 Button("Save") {
                     var updatedDatabase = database
                     updatedDatabase.name = displayName
+                    updatedDatabase.readOnly = readOnly
                     onSave(updatedDatabase)
                 }
                 .keyboardShortcut(.defaultAction)

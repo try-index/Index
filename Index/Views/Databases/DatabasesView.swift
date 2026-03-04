@@ -166,8 +166,8 @@ struct DatabasesView: View {
         .frame(minWidth: 600, idealWidth: 700, minHeight: 400, idealHeight: 500)
         .sheet(isPresented: $showOpenDatabaseModal) {
             OpenDatabaseView(
-                onFileSelected: { url, forceReadOnly in
-                    openDatabase(url: url, forceReadOnly: forceReadOnly)
+                onFileSelected: { url, readOnly, ignoreDataModel in
+                    openDatabase(url: url, readOnly: readOnly, ignoreDataModel: ignoreDataModel)
                 },
                 onBrowseSimulators: {
                     showOpenDatabaseModal = false
@@ -291,9 +291,9 @@ struct DatabasesView: View {
         selectedDatabase = nil
     }
 
-    private func openDatabase(url: URL, forceReadOnly: Bool) {
+    private func openDatabase(url: URL, readOnly: Bool, ignoreDataModel: Bool = false) {
         // Add to databases manager first
-        databasesManager.addDatabase(from: url, forceReadOnly: forceReadOnly)
+        databasesManager.addDatabase(from: url, readOnly: readOnly, ignoreDataModel: ignoreDataModel)
 
         // Find the newly added database and open it
         if let database = databasesManager.recentDatabases.first(where: { $0.filePath == url.path }) {

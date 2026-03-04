@@ -56,7 +56,7 @@ import SwiftUI
 
     // MARK: - Database Management
 
-    func addDatabase(from url: URL, forceReadOnly: Bool = false) {
+    func addDatabase(from url: URL, readOnly: Bool = false, ignoreDataModel: Bool = false) {
         // URL from NSOpenPanel is already security-scoped
         // When user selects a file, they implicitly grant access to create related files
         // (like SQLite WAL/SHM) in the same directory
@@ -70,7 +70,8 @@ import SwiftUI
             name: url.deletingPathExtension().lastPathComponent,
             filePath: url.path,
             bookmark: bookmark,
-            forceReadOnly: forceReadOnly
+            readOnly: readOnly,
+            ignoreDataModel: ignoreDataModel
         )
 
         // Remove existing database with same path
@@ -124,6 +125,13 @@ import SwiftUI
         }
         
         return nil
+    }
+
+    func updateReadOnly(for database: Database, readOnly: Bool) {
+        if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
+            recentDatabases[index].readOnly = readOnly
+            saveDatabases()
+        }
     }
 
     func updateDatabase(_ database: Database) {

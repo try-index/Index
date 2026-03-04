@@ -25,6 +25,7 @@ struct Record: Identifiable, Equatable, Hashable {
     struct RelationshipPreview: Hashable {
         let count: Int
         let firstValue: String?
+        let propertyCount: Int  // Total number of properties on the related entity
     }
     
     init(_ row: any SQLRow, from columns: [SQLiteColumn]) throws {

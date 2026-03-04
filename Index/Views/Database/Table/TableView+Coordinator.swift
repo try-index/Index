@@ -58,335 +58,281 @@ extension TableView {
             }
             
             let record = records[row]
-            
-            // Get the value, defaulting to .undefined for properties without values
             let value = record.values[property.column.name] ?? .undefined
-            
-            // Create custom cell view that responds to selection
             let cellView = TableCell()
             
             var leadingConstant: CGFloat = 4
             
             // Show indicator for new unsaved records (only first column and in editable mode)
             if !isReadOnly && newRecordIds.contains(record.id) && properties.first?.name == property.name {
-                let indicator = NSImageView()
-                indicator.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)
-                indicator.contentTintColor = .systemOrange
-                indicator.translatesAutoresizingMaskIntoConstraints = false
-                cellView.addSubview(indicator)
-                
-                NSLayoutConstraint.activate([
-                    indicator.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
-                    indicator.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                    indicator.widthAnchor.constraint(equalToConstant: 6),
-                    indicator.heightAnchor.constraint(equalToConstant: 6)
-                ])
-                
+                addNewRecordIndicator(to: cellView)
                 leadingConstant = 14
             }
             
-            // Check if this is a foreign key column
             if property.column.foreignKey != nil {
-                // Create a stack view for text + icon
-                let stackView = NSStackView()
-                stackView.orientation = .horizontal
-                stackView.spacing = 2
-                stackView.alignment = .centerY
-                stackView.distribution = .fillProportionally
-                stackView.translatesAutoresizingMaskIntoConstraints = false
-                
-                // Text field (editable for foreign keys, but styled differently)
-                let textField = EditableTextField()
-                textField.isBordered = false
-                textField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-                textField.translatesAutoresizingMaskIntoConstraints = false
-                textField.lineBreakMode = .byTruncatingTail
-                textField.usesSingleLineMode = true
-                textField.cell?.wraps = false
-                textField.cell?.isScrollable = false
-                textField.cell?.truncatesLastVisibleLine = true
-                
-                let stringValue: String
-                var useAttributedString = false
-                
-                // Use attributed string for arrays to color elements differently
-                if case .array(let values) = value {
-                    textField.attributedStringValue = attributedStringForArray(values, font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular))
-                    stringValue = "" // Not used for arrays
-                    useAttributedString = true
-                } else if (displayMode == .CoreData || displayMode == .SwiftData), 
-                          let fk = property.column.foreignKey {
-                    // For CoreData/SwiftData relationships, use attributed strings
-                    if case .undefined = value {
-                        // To-many relationship - show preview if available
-                        if let preview = record.relationshipPreviews[property.name] {
-                            if preview.count == 0 {
-                                stringValue = "nil"
-                            } else if let firstValue = preview.firstValue {
-                                // Always show as array with brackets for to-many relationships
-                                let result = NSMutableAttributedString()
-                                result.append(NSAttributedString(string: "[", attributes: [
-                                    .foregroundColor: NSColor.labelColor,
-                                    .font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                ]))
-                                result.append(attributedStringForRelationship(
-                                    typeName: fk.table,
-                                    properties: firstValue,
-                                    font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                ))
-                                if preview.count > 1 {
-                                    result.append(NSAttributedString(string: ", ...]", attributes: [
-                                        .foregroundColor: NSColor.labelColor,
-                                        .font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                    ]))
-                                } else {
-                                    result.append(NSAttributedString(string: "]", attributes: [
-                                        .foregroundColor: NSColor.labelColor,
-                                        .font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                    ]))
-                                }
-                                textField.attributedStringValue = result
-                                stringValue = ""
-                                useAttributedString = true
-                            } else {
-                                // Has items but no first value
-                                stringValue = "[\(fk.table)(...), ...]"
-                            }
-                        } else {
-                            stringValue = "nil"
-                        }
-                    } else {
-                        // To-one relationship - show object reference or null
-                        if case .null = value {
-                            stringValue = "null"
-                        } else if let preview = record.relationshipPreviews[property.name],
-                                  let firstValue = preview.firstValue {
-                            // Show preview with property info using attributed string
-                            textField.attributedStringValue = attributedStringForRelationship(
-                                typeName: fk.table,
-                                properties: firstValue,
-                                font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                            )
-                            stringValue = ""
-                            useAttributedString = true
-                        } else {
-                            // Fallback to showing ID
-                            let idValue = valueToString(value)
-                            stringValue = "\(fk.table)(id: \(idValue))"
-                        }
-                    }
-                } else {
-                    stringValue = valueToString(value)
-                }
-                
-                if !useAttributedString {
-                    textField.stringValue = stringValue
-                }
-                
-                textField.drawsBackground = false
-                textField.valueType = value
-                textField.isForeignKey = true // Mark as foreign key for button/width handling
-                
-                // Make editable if not read-only and not a data type (array/image)
-                // For CoreData/SwiftData, foreign keys are not editable
-                let isDataType = { () -> Bool in
-                    if case .array = value { return true }
-                    if case .image = value { return true }
-                    return false
-                }()
-                
-                let isCoreDataForeignKey = (displayMode == .CoreData || displayMode == .SwiftData) && property.column.foreignKey != nil
-                
-                if !isReadOnly && !isDataType && !isCoreDataForeignKey {
-                    textField.isEditable = true
-                    textField.delegate = self
-                    textField.allowsEditingTextAttributes = false
-                    textField.importsGraphics = false
-                    
-                    // Store metadata for editing
-                    textField.identifier = NSUserInterfaceItemIdentifier("\(record.id.uuidString)|\(property.column.name)")
-                } else {
-                    textField.isEditable = false
-                    textField.isSelectable = false
-                }
-                
-                // Arrow button
-                let button = NSButton()
-                let buttonImage = NSImage(systemSymbolName: "arrow.right.circle", accessibilityDescription: nil)
-                if let image = buttonImage?.withSymbolConfiguration(.init(pointSize: 12, weight: .regular)) {
-                    button.image = image
-                }
-                button.bezelStyle = .inline
-                button.isBordered = false
-                button.imageScaling = .scaleProportionallyDown
-                button.imagePosition = .imageOnly
-                button.target = self
-                button.action = #selector(foreignKeyButtonClicked(_:))
-                button.tag = row
-                button.identifier = NSUserInterfaceItemIdentifier(property.column.name)
-                button.translatesAutoresizingMaskIntoConstraints = false
-                button.contentTintColor = .systemBlue
-                
-                // Calculate preferred width based on text content
-                let textWidth: CGFloat
-                if useAttributedString {
-                    textWidth = textField.attributedStringValue.size().width
-                } else {
-                    textWidth = (stringValue as NSString).size(withAttributes: [
-                        .font: textField.font ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-                    ]).width
-                }
-                let preferredWidth = max(textWidth + 5, 15)
-                
-                // Create width constraint for text field
-                let textFieldWidthConstraint = textField.widthAnchor.constraint(equalToConstant: preferredWidth)
-                textFieldWidthConstraint.priority = .defaultHigh
-                textFieldWidthConstraint.isActive = true
-                
-                // Store constraint reference so it can be toggled during editing
-                textField.widthConstraint = textFieldWidthConstraint
-                
-                stackView.addArrangedSubview(textField)
-                stackView.addArrangedSubview(button)
-                
-                cellView.addSubview(stackView)
-                
-                // Set priorities - button stays fixed, text field can grow if needed
-                textField.setContentHuggingPriority(.init(249), for: .horizontal)
-                textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-                
-                button.setContentHuggingPriority(.required, for: .horizontal)
-                button.setContentCompressionResistancePriority(.required, for: .horizontal)
-                
-                NSLayoutConstraint.activate([
-                    stackView.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: leadingConstant),
-                    stackView.trailingAnchor.constraint(lessThanOrEqualTo: cellView.trailingAnchor, constant: -4),
-                    stackView.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                    button.widthAnchor.constraint(equalToConstant: 16),
-                    button.heightAnchor.constraint(equalToConstant: 16)
-                ])
-                
-                // Important: Set the textField property so updateColors() works
-                cellView.textField = textField
-                
-                // Store button reference in textField so we can hide/show it during editing
-                textField.foreignKeyButton = button
+                configureForeignKeyCell(cellView, property: property, record: record, value: value, row: row, leadingConstant: leadingConstant)
             } else {
-                let textField = EditableTextField()
-                textField.isBordered = false
-                textField.backgroundColor = .clear
-                textField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-                textField.translatesAutoresizingMaskIntoConstraints = false
-                textField.lineBreakMode = .byTruncatingTail
-                textField.usesSingleLineMode = true
-                textField.cell?.wraps = false
-                textField.cell?.isScrollable = false
-                textField.cell?.truncatesLastVisibleLine = true
-                
-                // Use attributed string for arrays to color elements differently
-                if case .array(let values) = value {
-                    textField.attributedStringValue = attributedStringForArray(values, font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular))
-                } else if (displayMode == .CoreData || displayMode == .SwiftData), 
-                          let fk = property.column.foreignKey {
-                    // For CoreData/SwiftData relationships, use attributed strings
-                    if case .undefined = value {
-                        // To-many relationship - show preview if available
-                        if let preview = record.relationshipPreviews[property.name] {
-                            if preview.count == 0 {
-                                textField.stringValue = "nil"
-                            } else if let firstValue = preview.firstValue {
-                                // Always show as array with brackets for to-many relationships
-                                let result = NSMutableAttributedString()
-                                result.append(NSAttributedString(string: "[", attributes: [
-                                    .foregroundColor: NSColor.labelColor,
-                                    .font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                ]))
-                                result.append(attributedStringForRelationship(
-                                    typeName: fk.table,
-                                    properties: firstValue,
-                                    font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                ))
-                                if preview.count > 1 {
-                                    result.append(NSAttributedString(string: ", ...]", attributes: [
-                                        .foregroundColor: NSColor.labelColor,
-                                        .font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                    ]))
-                                } else {
-                                    result.append(NSAttributedString(string: "]", attributes: [
-                                        .foregroundColor: NSColor.labelColor,
-                                        .font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                                    ]))
-                                }
-                                textField.attributedStringValue = result
-                            } else {
-                                // Has items but no first value
-                                textField.stringValue = "[\(fk.table)(...), ...]"
-                            }
-                        } else {
-                            textField.stringValue = "nil"
-                        }
-                    } else {
-                        // To-one relationship - show object reference or null
-                        if case .null = value {
-                            textField.stringValue = "null"
-                        } else if let preview = record.relationshipPreviews[property.name],
-                                  let firstValue = preview.firstValue {
-                            // Show preview with property info using attributed string
-                            textField.attributedStringValue = attributedStringForRelationship(
-                                typeName: fk.table,
-                                properties: firstValue,
-                                font: textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
-                            )
-                        } else {
-                            // Fallback to showing ID
-                            let idValue = valueToString(value)
-                            textField.stringValue = "\(fk.table)(id: \(idValue))"
-                        }
-                    }
-                } else {
-                    textField.stringValue = valueToString(value)
-                }
-                
-                textField.drawsBackground = false
-                textField.valueType = value
-                
-                // Make editable if not read-only and not a data type (array/image)
-                // For CoreData/SwiftData, foreign keys are not editable
-                let isDataType = { () -> Bool in
-                    if case .array = value { return true }
-                    if case .image = value { return true }
-                    return false
-                }()
-                
-                let isCoreDataForeignKey = (displayMode == .CoreData || displayMode == .SwiftData) && property.column.foreignKey != nil
-                
-                if !isReadOnly && !isDataType && !isCoreDataForeignKey {
-                    textField.isEditable = true
-                    textField.delegate = self
-                    textField.allowsEditingTextAttributes = false
-                    textField.importsGraphics = false
-                    
-                    // Store metadata for editing
-                    textField.identifier = NSUserInterfaceItemIdentifier("\(record.id.uuidString)|\(property.column.name)")
-                } else {
-                    textField.isEditable = false
-                    textField.isSelectable = false
-                }
-                
-                cellView.addSubview(textField)
-                
-                NSLayoutConstraint.activate([
-                    textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: leadingConstant),
-                    textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
-                    textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
-                ])
-                
-                cellView.textField = textField
+                configureStandardCell(cellView, property: property, record: record, value: value, leadingConstant: leadingConstant)
             }
             
             cellView.updateColors()
             
             return cellView
+        }
+        
+        private func addNewRecordIndicator(to cellView: TableCell) {
+            let indicator = NSImageView()
+            indicator.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)
+            indicator.contentTintColor = .systemOrange
+            indicator.translatesAutoresizingMaskIntoConstraints = false
+            cellView.addSubview(indicator)
+            
+            NSLayoutConstraint.activate([
+                indicator.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 4),
+                indicator.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                indicator.widthAnchor.constraint(equalToConstant: 6),
+                indicator.heightAnchor.constraint(equalToConstant: 6)
+            ])
+        }
+        
+        private func createTextField() -> EditableTextField {
+            let textField = EditableTextField()
+            textField.isBordered = false
+            textField.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            textField.lineBreakMode = .byTruncatingTail
+            textField.usesSingleLineMode = true
+            textField.cell?.wraps = false
+            textField.cell?.isScrollable = false
+            textField.cell?.truncatesLastVisibleLine = true
+            return textField
+        }
+        
+        /// Populates a text field with the appropriate display value for a relationship or plain value.
+        /// Returns `true` if an attributed string was set, `false` if a plain string was set.
+        @discardableResult
+        private func populateTextFieldValue(
+            _ textField: EditableTextField,
+            property: Property,
+            record: Record,
+            value: Value
+        ) -> (useAttributedString: Bool, stringValue: String) {
+            let font = textField.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+            
+            if case .array(let values) = value {
+                textField.attributedStringValue = attributedStringForArray(values, font: font)
+                return (true, "")
+            }
+            
+            if (displayMode == .CoreData || displayMode == .SwiftData),
+               let fk = property.column.foreignKey {
+                return populateRelationshipValue(textField, fk: fk, property: property, record: record, value: value, font: font)
+            }
+            
+            let stringValue = valueToString(value)
+            textField.stringValue = stringValue
+            return (false, stringValue)
+        }
+        
+        private func populateRelationshipValue(
+            _ textField: EditableTextField,
+            fk: SQLiteColumn.ForeignKey,
+            property: Property,
+            record: Record,
+            value: Value,
+            font: NSFont
+        ) -> (useAttributedString: Bool, stringValue: String) {
+            if case .undefined = value {
+                // To-many relationship
+                guard let preview = record.relationshipPreviews[property.name] else {
+                    textField.stringValue = "nil"
+                    return (false, "nil")
+                }
+                
+                if preview.count == 0 {
+                    textField.stringValue = "nil"
+                    return (false, "nil")
+                }
+                
+                guard let firstValue = preview.firstValue else {
+                    let fallback = "[\(fk.table)(...), ...]"
+                    textField.stringValue = fallback
+                    return (false, fallback)
+                }
+                
+                let result = NSMutableAttributedString()
+                result.append(NSAttributedString(string: "[", attributes: [
+                    .foregroundColor: NSColor.labelColor, .font: font
+                ]))
+                result.append(attributedStringForRelationship(
+                    typeName: fk.table, properties: firstValue, font: font,
+                    propertyCount: preview.propertyCount
+                ))
+                
+                let suffix = preview.count > 1 ? ", ...]" : "]"
+                result.append(NSAttributedString(string: suffix, attributes: [
+                    .foregroundColor: NSColor.labelColor, .font: font
+                ]))
+                
+                textField.attributedStringValue = result
+                return (true, "")
+            } else {
+                // To-one relationship
+                if case .null = value {
+                    textField.stringValue = "null"
+                    return (false, "null")
+                }
+                
+                if let preview = record.relationshipPreviews[property.name],
+                   let firstValue = preview.firstValue {
+                    textField.attributedStringValue = attributedStringForRelationship(
+                        typeName: fk.table, properties: firstValue, font: font,
+                        propertyCount: preview.propertyCount
+                    )
+                    return (true, "")
+                }
+                
+                let idValue = valueToString(value)
+                let fallback = "\(fk.table)(id: \(idValue))"
+                textField.stringValue = fallback
+                return (false, fallback)
+            }
+        }
+        
+        private func configureEditability(
+            _ textField: EditableTextField,
+            property: Property,
+            record: Record,
+            value: Value
+        ) {
+            let isDataType: Bool = {
+                if case .array = value { return true }
+                if case .image = value { return true }
+                return false
+            }()
+            
+            let isCoreDataForeignKey = (displayMode == .CoreData || displayMode == .SwiftData)
+                && property.column.foreignKey != nil
+            
+            if !isReadOnly && !isDataType && !isCoreDataForeignKey {
+                textField.isEditable = true
+                textField.delegate = self
+                textField.allowsEditingTextAttributes = false
+                textField.importsGraphics = false
+                textField.identifier = NSUserInterfaceItemIdentifier("\(record.id.uuidString)|\(property.column.name)")
+            } else {
+                textField.isEditable = false
+                textField.isSelectable = false
+            }
+        }
+        
+        private func configureForeignKeyCell(
+            _ cellView: TableCell,
+            property: Property,
+            record: Record,
+            value: Value,
+            row: Int,
+            leadingConstant: CGFloat
+        ) {
+            let stackView = NSStackView()
+            stackView.orientation = .horizontal
+            stackView.spacing = 2
+            stackView.alignment = .centerY
+            stackView.distribution = .fillProportionally
+            stackView.translatesAutoresizingMaskIntoConstraints = false
+            
+            let textField = createTextField()
+            let (useAttributedString, stringValue) = populateTextFieldValue(textField, property: property, record: record, value: value)
+            
+            textField.drawsBackground = false
+            textField.valueType = value
+            textField.isForeignKey = true
+            
+            configureEditability(textField, property: property, record: record, value: value)
+            
+            // Arrow button
+            let button = NSButton()
+            button.bezelStyle = .inline
+            button.isBordered = false
+            button.imageScaling = .scaleProportionallyDown
+            button.imagePosition = .imageOnly
+            button.target = self
+            button.action = #selector(foreignKeyButtonClicked(_:))
+            button.tag = row
+            button.identifier = NSUserInterfaceItemIdentifier(property.column.name)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.contentTintColor = .systemBlue
+            
+            if let buttonImage = NSImage(systemSymbolName: "arrow.right.circle", accessibilityDescription: nil),
+               let image = buttonImage.withSymbolConfiguration(.init(pointSize: 12, weight: .regular)) {
+                button.image = image
+            }
+            
+            // Calculate preferred width based on text content
+            let textWidth: CGFloat
+            
+            if useAttributedString {
+                textWidth = textField.attributedStringValue.size().width
+            } else {
+                textWidth = (stringValue as NSString).size(withAttributes: [
+                    .font: textField.font ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+                ]).width
+            }
+            
+            let textFieldWidthConstraint = textField.widthAnchor.constraint(equalToConstant: max(textWidth + 5, 15))
+            textFieldWidthConstraint.priority = .defaultHigh
+            textFieldWidthConstraint.isActive = true
+            textField.widthConstraint = textFieldWidthConstraint
+            
+            stackView.addArrangedSubview(textField)
+            stackView.addArrangedSubview(button)
+            
+            cellView.addSubview(stackView)
+            
+            textField.setContentHuggingPriority(.init(249), for: .horizontal)
+            textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            button.setContentCompressionResistancePriority(.required, for: .horizontal)
+            
+            NSLayoutConstraint.activate([
+                stackView.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: leadingConstant),
+                stackView.trailingAnchor.constraint(lessThanOrEqualTo: cellView.trailingAnchor, constant: -4),
+                stackView.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                button.widthAnchor.constraint(equalToConstant: 16),
+                button.heightAnchor.constraint(equalToConstant: 16)
+            ])
+            
+            cellView.textField = textField
+            textField.foreignKeyButton = button
+        }
+        
+        private func configureStandardCell(
+            _ cellView: TableCell,
+            property: Property,
+            record: Record,
+            value: Value,
+            leadingConstant: CGFloat
+        ) {
+            let textField = createTextField()
+            textField.backgroundColor = .clear
+            
+            populateTextFieldValue(textField, property: property, record: record, value: value)
+            
+            textField.drawsBackground = false
+            textField.valueType = value
+            
+            configureEditability(textField, property: property, record: record, value: value)
+            
+            cellView.addSubview(textField)
+            
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: leadingConstant),
+                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -4),
+                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+            ])
+            
+            cellView.textField = textField
         }
         
         func tableViewSelectionDidChange(_ notification: Notification) {
@@ -433,10 +379,11 @@ extension TableView {
             // For to-many relationships (inverse relationships), use the current record's Z_PK
             // For to-one relationships, use the actual foreign key value
             let value: Value
-            if let actualValue = record.values[columnName] {
+            
+            if let actualValue = record.values[columnName], actualValue != .undefined {
                 value = actualValue
             } else {
-                // This is likely a to-many relationship - get the current record's primary key
+                // This is a to-many relationship - get the current record's primary key
                 if let pkValue = record.values["Z_PK"] {
                     value = pkValue
                 } else {
@@ -579,6 +526,14 @@ extension TableView {
             }
         }
         
+        private static let readableDateFormatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .medium
+            
+            return formatter
+        }()
+        
         private func valueToString(_ value: Value) -> String {
             switch value {
             case .null:
@@ -604,6 +559,9 @@ extension TableView {
                 // Display as Swift enum case with dot prefix
                 return ".\(caseName)"
             case .timestamp(let date):
+                if displayMode == .CoreData || displayMode == .SwiftData {
+                    return Self.readableDateFormatter.string(from: date)
+                }
                 return date.ISO8601Format()
             case .array(let values):
                 // Convert array to JSON-like representation
@@ -670,32 +628,47 @@ extension TableView {
             return result
         }
         
+        enum RelationshipDisplayStyle {
+            /// Displays as `TypeName(prop1: val1, prop2: val2)`
+            case initializer
+            /// Displays as `{ prop1: val1, prop2: val2, ... }` with a max of 2 visible properties
+            case json
+        }
+        
         private func attributedStringForRelationship(
             typeName: String,
             properties: String?,
-            font: NSFont
+            font: NSFont,
+            propertyCount: Int = 0,
+            style: RelationshipDisplayStyle = .initializer
         ) -> NSAttributedString {
             let result = NSMutableAttributedString()
             
-            // Type name in type color (cyan/teal)
-            result.append(NSAttributedString(string: typeName, attributes: [
-                .foregroundColor: NSColor(XcodeThemeColors.type),
-                .font: font
-            ]))
-            
-            // Opening parenthesis in default color
-            result.append(NSAttributedString(string: "(", attributes: [
-                .foregroundColor: NSColor.labelColor,
-                .font: font
-            ]))
+            switch style {
+            case .initializer:
+                // Type name in type color
+                result.append(NSAttributedString(string: typeName, attributes: [
+                    .foregroundColor: NSColor(XcodeThemeColors.type),
+                    .font: font
+                ]))
+                result.append(NSAttributedString(string: "(", attributes: [
+                    .foregroundColor: NSColor.labelColor,
+                    .font: font
+                ]))
+            case .json:
+                result.append(NSAttributedString(string: "{ ", attributes: [
+                    .foregroundColor: NSColor.labelColor,
+                    .font: font
+                ]))
+            }
             
             // Properties with syntax coloring
             if let properties = properties {
-                // Split by ", " to get individual properties
                 let propertyPairs = properties.components(separatedBy: ", ")
+                let maxVisible = 2
+                let visiblePairs = Array(propertyPairs.prefix(maxVisible))
                 
-                for (index, pair) in propertyPairs.enumerated() {
-                    // Split by ": " to get property name and value
+                for (index, pair) in visiblePairs.enumerated() {
                     let components = pair.components(separatedBy: ": ")
                     
                     if components.count == 2 {
@@ -708,7 +681,6 @@ extension TableView {
                             .font: font
                         ]))
                         
-                        // Colon and space in default color
                         result.append(NSAttributedString(string: ": ", attributes: [
                             .foregroundColor: NSColor.labelColor,
                             .font: font
@@ -717,16 +689,12 @@ extension TableView {
                         // Value with appropriate color
                         let valueColor: NSColor
                         if propertyValue.hasPrefix("\"") && propertyValue.hasSuffix("\"") {
-                            // String value
                             valueColor = NSColor(XcodeThemeColors.string)
                         } else if Int(propertyValue) != nil || Double(propertyValue) != nil {
-                            // Number value
                             valueColor = NSColor(XcodeThemeColors.number)
                         } else if propertyValue == "true" || propertyValue == "false" || propertyValue == "nil" {
-                            // Keyword value
                             valueColor = NSColor(XcodeThemeColors.keyword)
                         } else {
-                            // Default color for other values
                             valueColor = .labelColor
                         }
                         
@@ -735,21 +703,19 @@ extension TableView {
                             .font: font
                         ]))
                         
-                        // Add comma and space between properties
-                        if index < propertyPairs.count - 1 {
+                        if index < visiblePairs.count - 1 {
                             result.append(NSAttributedString(string: ", ", attributes: [
                                 .foregroundColor: NSColor.labelColor,
                                 .font: font
                             ]))
                         }
                     } else {
-                        // Fallback if parsing fails
                         result.append(NSAttributedString(string: pair, attributes: [
                             .foregroundColor: NSColor.labelColor,
                             .font: font
                         ]))
                         
-                        if index < propertyPairs.count - 1 {
+                        if index < visiblePairs.count - 1 {
                             result.append(NSAttributedString(string: ", ", attributes: [
                                 .foregroundColor: NSColor.labelColor,
                                 .font: font
@@ -757,19 +723,35 @@ extension TableView {
                         }
                     }
                 }
+                
+                // Show three dots if the entity has more properties than what's visible
+                let hasMoreProperties = propertyCount > 0 ? propertyCount > visiblePairs.count : propertyPairs.count > maxVisible
+                
+                if hasMoreProperties {
+                    result.append(NSAttributedString(string: ", ...", attributes: [
+                        .foregroundColor: NSColor.secondaryLabelColor,
+                        .font: font
+                    ]))
+                }
             } else {
-                // No properties - show "..."
                 result.append(NSAttributedString(string: "...", attributes: [
                     .foregroundColor: NSColor.labelColor,
                     .font: font
                 ]))
             }
             
-            // Closing parenthesis in default color
-            result.append(NSAttributedString(string: ")", attributes: [
-                .foregroundColor: NSColor.labelColor,
-                .font: font
-            ]))
+            switch style {
+            case .initializer:
+                result.append(NSAttributedString(string: ")", attributes: [
+                    .foregroundColor: NSColor.labelColor,
+                    .font: font
+                ]))
+            case .json:
+                result.append(NSAttributedString(string: " }", attributes: [
+                    .foregroundColor: NSColor.labelColor,
+                    .font: font
+                ]))
+            }
             
             return result
         }

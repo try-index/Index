@@ -5,6 +5,7 @@
 //  Created by Axel Martinez on 16/2/26.
 //
 
+import Combine
 import SwiftUI
 
 struct StatusBar: View {
@@ -13,6 +14,7 @@ struct StatusBar: View {
     let tableName: String
     let unsavedCount: Int
     var isReadOnly: Bool = false
+    var saveRecords: PassthroughSubject<Void, Never>
     
     @Binding var isUtilityExpanded: Bool
     
@@ -38,7 +40,7 @@ struct StatusBar: View {
                 .foregroundStyle(.secondary)
                 
                 Button {
-                    NotificationCenter.default.post(name: .saveRecordsRequested, object: nil)
+                    saveRecords.send()
                 } label: {
                     Text("Save")
                         .font(.system(size: 11, weight: .medium))
@@ -70,12 +72,14 @@ struct StatusBar: View {
 
 #Preview {
     @Previewable @State var isExpanded = false
+    @Previewable @State var saveRecords: PassthroughSubject<Void, Never> = .init()
     
     StatusBar(
         recordCount: 150,
         filteredCount: 150,
         tableName: "users",
         unsavedCount: 2,
+        saveRecords: saveRecords,
         isUtilityExpanded: $isExpanded
     )
     .frame(height: 24)

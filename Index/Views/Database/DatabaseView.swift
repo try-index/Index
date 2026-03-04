@@ -10,8 +10,8 @@ import SQLiteKit
 import SwiftUI
 
 struct DatabaseView<T: SQLiteTable>: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.openWindow) var openWindow
     @Environment(DatabasesManager.self) var databasesManager
     @Environment(SimulatorsManager.self) var simManager
     
@@ -19,20 +19,23 @@ struct DatabaseView<T: SQLiteTable>: View {
     
     @State var tabs: [TabItem<T>] = []
     @State var selectedTab: TabItem<T>?
+    @State var client = SQLiteClient()
+    @State var databaseError: String?
+    @State var showDatabaseError = false
+    @State var displayMode: DisplayMode = .SQLite
+    @State var isConnected = false
+    @State var isReadOnly = false
     
-    @State private var client = SQLiteClient()
-    @State private var databaseError: String?
-    @State private var displayMode: DisplayMode = .SQLite
-    @State private var showDatabaseError = false
-    @State private var isConnected = false
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var selectedTable: T?
     @State private var searchText: String = ""
-    @State private var refreshContent: PassthroughSubject<Void, Never> = .init()
     @State private var selectedRecordsCount = 0
-    @State private var isReadOnly = false
     @State private var isFileMenuVisible = false
     @State private var isUtilityExpanded = false
+    @State private var refreshContentPublisher: PassthroughSubject<Void, Never> = .init()
+    @State private var addRecordPublisher: PassthroughSubject<Void, Never> = .init()
+    @State private var deleteRecordsPublisher: PassthroughSubject<Void, Never> = .init()
+    @State private var saveRecordsPublisher: PassthroughSubject<Void, Never> = .init()
     
     var fileURL: URL {
         URL(filePath: database.filePath)
@@ -58,15 +61,36 @@ struct DatabaseView<T: SQLiteTable>: View {
                                 tabs: tabs,
                                 selectedTab: $selectedTab,
                                 tabTitle: { $0.title },
-                                onClose: { tab in
-                                    closeTab(tab)
-                                }
+                                onClose: closeTab
                             )
                         }
                         
                         // Tab content
                         if let selectedTab = selectedTab {
-                            tabContentView(for: selectedTab)
+                            VStack(spacing: 0) {
+                                ContentView(
+                                    client: client,
+                                    dataObject: selectedTab.table,
+                                    refreshPublisher: refreshContentPublisher,
+                                    addRecordPublisher: addRecordPublisher,
+                                    deleteRecordsPublisher: deleteRecordsPublisher,
+                                    saveRecordsPublisher: saveRecordsPublisher,
+                                    filterColumn: selectedTab.filterColumn,
+                                    filterValue: selectedTab.filterValue,
+                                    onOpenRelatedTable: openRelatedTable,
+                                    searchText: $searchText,
+                                    isUtilityExpanded: $isUtilityExpanded,
+                                    selectedRecordsCount: $selectedRecordsCount,
+                                    isReadOnly: isReadOnly,
+                                    displayMode: displayMode
+                                )
+                                
+                                // Utility drawer
+                                UtilityView(
+                                    sqlQuery: selectedTab.sqlQuery,
+                                    isExpanded: $isUtilityExpanded
+                                )
+                            }
                         } else if selectedTable != nil {
                             ContentUnavailableView {
                                 Label("No Tabs Open", systemImage: "square.stack.3d.up.slash")
@@ -115,13 +139,13 @@ struct DatabaseView<T: SQLiteTable>: View {
                                     .padding(.leading, 8)
                             } else {
                                 Button("", systemImage: "plus", action: {
-                                    requestAddRecord()
+                                    addRecordPublisher.send()
                                 })
                                 .disabled(selectedTab == nil)
                                 .help("Add Record")
                                 
                                 Button("", systemImage: "trash", action: {
-                                    requestDeleteRecords()
+                                    deleteRecordsPublisher.send()
                                 })
                                 .disabled(selectedRecordsCount == 0)
                                 .help("Delete Selected Records (\(selectedRecordsCount))")
@@ -131,7 +155,7 @@ struct DatabaseView<T: SQLiteTable>: View {
                                 .frame(height: 16)
                             
                             Button("", systemImage: "arrow.clockwise", action: {
-                                refreshContent.send()
+                                refreshContentPublisher.send()
                             })
                             .disabled(self.selectedTable == nil)
                             .help("Refresh")
@@ -144,11 +168,13 @@ struct DatabaseView<T: SQLiteTable>: View {
             }
         }
         .navigationTitle("")
-        .onAppear {
-            openDatabase()
+        .task {
+            await openDatabase()
         }
         .onDisappear {
-            closeDatabase()
+            Task {
+                await closeDatabase()
+            }
         }
         .onChange(of: selectedTable) { _, newTable in
             if let newTable = newTable {
@@ -163,212 +189,8 @@ struct DatabaseView<T: SQLiteTable>: View {
             Text(databaseError ?? "Failed to open the database file.")
         }
     }
-    
-    @ViewBuilder
-    private func tabContentView(for tab: TabItem<T>) -> some View {
-        VStack(spacing: 0) {
-            ContentView(
-                client: client,
-                searchText: $searchText,
-                dataObject: tab.table,
-                refresh: refreshContent,
-                filterColumn: tab.filterColumn,
-                filterValue: tab.filterValue,
-                onOpenRelatedTable: { table, column, value in
-                    openRelatedTable(table: table, column: column, value: value)
-                },
-                isUtilityExpanded: $isUtilityExpanded,
-                selectedRecordsCount: $selectedRecordsCount,
-                isReadOnly: isReadOnly,
-                displayMode: displayMode
-            )
-            
-            // Utility drawer
-            UtilityView(
-                sqlQuery: tab.sqlQuery,
-                isExpanded: $isUtilityExpanded
-            )
-        }
-    }
-    
-    // MARK: - Connection
-    
-    private func openDatabase() {
-        guard let url = databasesManager.resolveURL(for: database) else {
-            databaseError = "Could not access the file. It may have been moved or deleted."
-            showDatabaseError = true
-            return
-        }
-        
-        Task {
-            do {
-                // Try to find an existing directory bookmark from another database in the same folder
-                let existingDirBookmark = database.directoryBookmark ?? databasesManager.findExistingDirectoryBookmark(for: database)
-                
-                // Connect to database, passing existing bookmarks if available
-                let (newFileBookmark, newDirBookmark) = try await client.connect(
-                    to: url,
-                    bookmarkData: database.bookmark,
-                    directoryBookmarkData: existingDirBookmark,
-                    readOnly: database.forceReadOnly
-                )
-                
-                // If new bookmarks were created, save them
-                if let newFileBookmark = newFileBookmark {
-                    databasesManager.updateBookmark(for: database, bookmark: newFileBookmark)
-                }
-                
-                if let newDirBookmark = newDirBookmark {
-                    databasesManager.updateDirectoryBookmark(for: database, bookmark: newDirBookmark)
-                }
-                
-                databasesManager.updateLastOpened(for: database)
-                
-                let mode = await configureDisplayMode()
-                let readOnly = await client.isReadOnly
-                
-                await MainActor.run {
-                    displayMode = mode
-                    isConnected = true
-                    isReadOnly = readOnly
-                }
-                
-                // If we don't have a directory bookmark and database is not read-only,
-                // check if we can write by attempting to create a test file
-                if !readOnly && !database.forceReadOnly && database.directoryBookmark == nil {
-                    await checkAndRequestDirectoryAccessIfNeeded()
-                }
-            } catch {
-                await MainActor.run {
-                    databaseError = error.localizedDescription
-                    showDatabaseError = true
-                }
-            }
-        }
-    }
-    
-    private func checkAndRequestDirectoryAccessIfNeeded() async {
-        guard let url = databasesManager.resolveURL(for: database) else { return }
-        
-        let parentDir = url.deletingLastPathComponent()
-        let testFile = parentDir.appendingPathComponent(".index_write_test")
-        
-        // Try to create a test file to check write access
-        let canWrite = FileManager.default.createFile(atPath: testFile.path, contents: Data())
-        
-        if canWrite {
-            // Clean up test file
-            try? FileManager.default.removeItem(at: testFile)
-            
-            return
-        }
-        
-        // Request directory access from user
-        let response = await client.requestDirectoryAccess(for: url)
-        
-        switch response {
-        case .granted(let dirBookmark):
-            databasesManager.updateDirectoryBookmark(for: database, bookmark: dirBookmark)
-            
-            // Reconnect with the new directory bookmark
-            do {
-                let (newFileBookmark, newDirBookmark) = try await client.connect(
-                    to: url,
-                    bookmarkData: database.bookmark,
-                    directoryBookmarkData: dirBookmark
-                )
-                
-                if let newFileBookmark = newFileBookmark {
-                    databasesManager.updateBookmark(for: database, bookmark: newFileBookmark)
-                }
-                if let newDirBookmark = newDirBookmark {
-                    databasesManager.updateDirectoryBookmark(for: database, bookmark: newDirBookmark)
-                }
-            } catch {
-                // Reconnection failed, will continue in read-only mode
-            }
-        case .openReadOnly:
-            // Reconnect in read-only mode
-            do {
-                let _ = try await client.connect(
-                    to: url,
-                    bookmarkData: database.bookmark,
-                    directoryBookmarkData: nil,
-                    readOnly: true
-                )
-                
-                let readOnly = await client.isReadOnly
-                await MainActor.run {
-                    isReadOnly = readOnly
-                }
-            } catch {
-                // Failed to reconnect, stay in current state
-            }
-        case .cancelled:
-            // User cancelled, continue in current state (read-only)
-            break
-        }
-    }
-    
-    private func closeDatabase() {
-        Task {
-            try? await client.close()
-        }
-        
-        // Check if this is the last database window closing
-        // Count windows that are not the "Databases" window and not closing
-        let databaseWindows = NSApp.windows.filter { window in
-            window.title != "Databases" && window.isVisible
-        }
-        
-        // If only one database window left (this one), show the databases window
-        if databaseWindows.count <= 1 {
-            openWindow(id: "databases")
-        }
-    }
-    
-    private func configureDisplayMode() async -> DisplayMode {
-        guard let metadata = await client.metadata,
-              let version = metadata["NSPersistenceFrameworkVersion"] as? Int else {
-            return .SQLite
-        }
-        
-        // Force read-only mode for CoreData/SwiftData until custom UI is implemented
-        let mode: DisplayMode = version > 800 ? .SwiftData : .CoreData
-        
-        // Reconnect in read-only mode if not already
-        if !(await client.isReadOnly) {
-            if let url = databasesManager.resolveURL(for: database) {
-                _ = try? await client.connect(
-                    to: url,
-                    bookmarkData: database.bookmark,
-                    directoryBookmarkData: database.directoryBookmark,
-                    readOnly: true
-                )
-            }
-        }
-        
-        return mode
-    }
-    
-    // MARK: - Record Actions
-    
-    private func requestAddRecord() {
-        // Trigger add record in ContentView
-        NotificationCenter.default.post(name: .addRecordRequested, object: nil)
-    }
-    
-    private func requestDeleteRecords() {
-        // Trigger delete confirmation in ContentView
-        NotificationCenter.default.post(name: .deleteRecordsRequested, object: nil)
-    }
 }
 
-extension Notification.Name {
-    static let deleteRecordsRequested = Notification.Name("deleteRecordsRequested")
-    static let addRecordRequested = Notification.Name("addRecordRequested")
-    static let saveRecordsRequested = Notification.Name("saveRecordsRequested")
-}
 
 #Preview {
     DatabaseView<SQLiteTable>(

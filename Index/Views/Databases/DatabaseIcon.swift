@@ -35,11 +35,23 @@ struct DatabaseIcon: View {
                 }
             }
 
-            Text(database.displayName)
-                .font(.system(size: 11))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: 90)
+            VStack(spacing: 2) {
+                Text(database.displayName)
+                    .font(.system(size: 11))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 90)
+
+                if database.readOnly {
+                    Text("READ ONLY")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(.quaternary)
+                        .clipShape(Capsule())
+                }
+            }
         }
         .padding(8)
         .background(

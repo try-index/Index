@@ -14,8 +14,17 @@ public enum Value: Hashable {
     case float(Float)
     case real(Double)
     case text(String)
+    case uuid(UUID)
+    case data(String)  // Decoded binary data (JSON, XML, etc.) - no quotes
+    case enumValue(String)  // Enum case name - colored as type
     case array([Value])
     case image(NSImage)
     case timestamp(Date)
-    case null
+    case null  // Explicit NULL value in database
+    case undefined  // Value not present (virtual columns, relationships)
+    
+    var isNull: Bool {
+        if case .null = self { return true }
+        return false
+    }
 }

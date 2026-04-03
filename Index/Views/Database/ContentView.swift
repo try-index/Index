@@ -12,23 +12,50 @@ import SwiftUI
 struct ContentView<T: SQLiteTable>: View {
     let client: SQLiteClient
 
-    @Binding var searchText: String
+    @State var records = [Record]()
+    @State var selectedRecords = Set<UUID>()
+    @State var newRecords = [Record]() // Temporary unsaved records
+    @State var editingRecordId: UUID? // Track which record is being edited
+    @State var error: SQLiteError? = nil
+    @State var showAlert = false
+    @State var properties = [Property]()
+    @State var showDeleteConfirmation = false
 
     @State private var isLoading = false
-    @State private var selectedRecords = Set<UUID>()
-    @State private var properties = [Property]()
-    @State private var records = [Record]()
-    @State private var error: SQLiteError? = nil
-    @State private var showAlert = false
 
     let tableFont: NSFont = .monospacedSystemFont(ofSize: 13, weight: .regular)
 
     var dataObject: T
-    var refresh: PassthroughSubject<Void, Never>
+    var refreshPublisher: PassthroughSubject<Void, Never>
+    var addRecordPublisher: PassthroughSubject<Void, Never>
+    var deleteRecordsPublisher: PassthroughSubject<Void, Never>
+    var saveRecordsPublisher: PassthroughSubject<Void, Never>
+    var filterColumn: String?
+    var filterValue: Value?
+    var onOpenRelatedTable: ((T, String, Value) -> Void)?
+    
+    @Binding var searchText: String
+    @Binding var isUtilityExpanded: Bool
+    @Binding var selectedRecordsCount: Int
+    
+    var isReadOnly: Bool = false
+    var displayMode: DisplayMode = .SQLite
 
     var filteredRecords: [Record] {
-        return records.filter({ record in
-            self.searchText.isEmpty || record.values.contains(where: {
+        // Combine new records with existing records (new records at the bottom)
+        let allRecords = records + newRecords
+        
+        return allRecords.filter({ record in
+            // Apply column filter if specified
+            if let filterColumn = filterColumn, let filterValue = filterValue {
+                guard let recordValue = record.values[filterColumn],
+                      recordValue == filterValue else {
+                    return false
+                }
+            }
+            
+            // Apply search text filter
+            return self.searchText.isEmpty || record.values.contains(where: {
                 switch($0.value){
                 case .text(let text):
                     return text.contains(self.searchText)
@@ -42,85 +69,132 @@ struct ContentView<T: SQLiteTable>: View {
     var body: some View {
         VStack(spacing: 0) {
             if isLoading {
-                ProgressView()
-            } else {
-                if records.isEmpty {
+                ZStack {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .allowsHitTesting(false)
+                    ProgressView()
+                }
+            } else if records.isEmpty && newRecords.isEmpty {
+                ZStack {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .allowsHitTesting(false)
                     ContentUnavailableView("No records to show", image: "table.xmark")
-                } else {
-                    HStack(alignment: .center, spacing: 10) {
-                        Spacer()
-
-                        Button(action: {}, label: {
-                            Image(systemName: "plus")
-                        })
-                        .disabled(true)
-                        .buttonStyle(.link)
-
-                        Button(action: removeRecords, label: {
-                            Image(systemName: "trash")
-                        })
-                        .buttonStyle(.link)
-                        .disabled(selectedRecords.isEmpty)
-
-                        Button(action: removeRecords, label: {
-                            Image(systemName: "info")
-                        })
-                        .disabled(true)
-                        .buttonStyle(.link)
-
-                        Spacer()
-                    }
-                    .font(.headline)
-                    .padding(.vertical)
-
-                    Table(filteredRecords, selection: $selectedRecords) {
-                        TableColumnForEach(properties, id:\.name) { property in
-                            TableColumn(
-                                Text("""
-                                \(Text(property.name).foregroundColor(XcodeThemeColors.property)): \
-                                \(Text(property.type).foregroundColor(XcodeThemeColors.type))
-                                """)
-                            ) { record in
-                                if let value = record.values[property.column.name] {
-                                    CellView(value: value)
-                                        .padding(.vertical, 5)
-                                }
+                }
+            } else {
+                VStack(spacing: 0) {
+                    TableView(
+                        records: filteredRecords,
+                        properties: properties,
+                        isReadOnly: isReadOnly,
+                        displayMode: displayMode,
+                        newRecordIds: Set(newRecords.map { $0.id }),
+                        selectedRecords: $selectedRecords,
+                        scrollToRecordId: editingRecordId,
+                        onUpdate: { recordId, columnName, newValue in
+                            updateRecord(id: recordId, columnName: columnName, to: newValue)
+                        },
+                        onForeignKeyClick: onOpenRelatedTable != nil ? { fk, value, record in
+                            handleForeignKeyClick(foreignKey: fk, value: value, callback: onOpenRelatedTable!)
+                        } : nil,
+                        onRowDeselected: { recordId in
+                            // Only validate when the entire row is deselected (user clicked away)
+                            if newRecords.contains(where: { $0.id == recordId }) {
+                                validateAndSaveOrRemoveRecord(recordId)
                             }
-                            .width(min: property.displayName.estimatedWidth(using: tableFont))
+                            
+                            editingRecordId = nil
+                        },
+                        onEnterPressed: { recordId in
+                            // Save record when user presses enter
+                            if newRecords.contains(where: { $0.id == recordId }) {
+                                validateAndSaveOrRemoveRecord(recordId)
+                            }
                         }
-                    }
-                    .font(Font(tableFont))
-                    .alternatingRowBackgrounds(.disabled)
-                    .onKeyPress { event in
-                        switch event.key {
-                        case "\u{7f}", .delete:
-                            removeRecords()
-                            return .handled
-                        default:
-                            return .ignored
-                        }
-                    }
+                    )
+                    
+                    StatusBar(
+                        recordCount: records.count,
+                        filteredCount: filteredRecords.count,
+                        tableName: (dataObject as? Entity)?.displayName ?? dataObject.name,
+                        unsavedCount: newRecords.count,
+                        isReadOnly: isReadOnly,
+                        saveRecords: saveRecordsPublisher,
+                        isUtilityExpanded: $isUtilityExpanded
+                    )
                 }
             }
         }
         .onAppear(perform: refreshRecords)
         .onChange(of: dataObject, refreshRecords)
-        .onReceive(refresh, perform: refreshRecords)
+        .onReceive(refreshPublisher, perform: refreshRecords)
+        .onChange(of: selectedRecords) { _, newValue in
+            selectedRecordsCount = newValue.count
+        }
+        .onReceive(deleteRecordsPublisher) { _ in
+            confirmDeleteRecords()
+        }
+        .onReceive(addRecordPublisher) { _ in
+            addEmptyRecord()
+        }
+        .onReceive(saveRecordsPublisher) { _ in
+            saveNewRecords()
+        }
         .alert(isPresented: $showAlert, error: error) { _ in
             Button("OK") {
                 self.showAlert = false
             }
         } message: { error in
-            Text(error.recoverySuggestion ?? "Try opening a different file")
+            if let suggestion = error.recoverySuggestion {
+                Text(suggestion)
+            } else {
+                // Provide context-appropriate recovery suggestions
+                let errorMessage = error.localizedDescription.lowercased()
+                
+                if errorMessage.contains("constraint") {
+                    Text("This change violates a database constraint. Check foreign key references or unique constraints.")
+                } else if errorMessage.contains("readonly") || errorMessage.contains("read-only") {
+                    Text("The database is read-only. Check file permissions or open in write mode.")
+                } else if errorMessage.contains("locked") {
+                    Text("The database is locked by another process. Close other connections and try again.")
+                } else {
+                    Text("Please check your input and try again.")
+                }
+            }
+        }
+        .alert("Delete Records", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteRecords()
+            }
+        } message: {
+            Text("Are you sure you want to delete \(selectedRecords.count) record(s)? This action cannot be undone.")
+        }
+        .onKeyPress { event in
+            // Check for Escape key to cancel new record creation
+            if event.key == .escape, let editingId = editingRecordId, 
+               newRecords.contains(where: { $0.id == editingId }) {
+                // Remove the new record being edited
+                newRecords.removeAll { $0.id == editingId }
+                selectedRecords.remove(editingId)
+                editingRecordId = nil
+                return .handled
+            }
+            
+            // Check for Command+S to save new records (only in editable mode)
+            if event.key == "s" && event.modifiers.contains(.command) && !isReadOnly && !newRecords.isEmpty {
+                saveNewRecords()
+                return .handled
+            }
+            return .ignored
         }
     }
 
     func refreshRecords() {
-        Task {
-            await MainActor.run {
-                self.isLoading = true
-            }
-
+        isLoading = true
+        
+        Task(priority: .userInitiated) {
             do {
                 var loadedProperties = [Property]()
                 var loadedRecords = [Record]()
@@ -152,6 +226,7 @@ struct ContentView<T: SQLiteTable>: View {
                 }
             } catch {
                 print("Failed to load records: \(error)")
+                
                 await MainActor.run {
                     self.isLoading = false
                 }
@@ -159,48 +234,68 @@ struct ContentView<T: SQLiteTable>: View {
         }
     }
 
-    func removeRecords() {
-        guard selectedRecords.isEmpty else { return }
-
-        Task(priority: .userInitiated) {
-            do {
-                let recordsToDelete = records.filter { selectedRecords.contains($0.id) }
-
-                // Delete records from the database
-                try await client.deleteRecords(recordsToDelete, from: dataObject)
-
-                await MainActor.run {
-                    // Remove the records from the local array
-                    records.removeAll { selectedRecords.contains($0.id) }
-
-                    // Clear selection
-                    selectedRecords.removeAll()
-                }
-            } catch let error as SQLiteError {
-                self.error = error
-                self.showAlert = true
-            }
+    private func valueToString(_ value: Value) -> String {
+        switch value {
+        case .null:
+            return "NULL"
+        case .undefined:
+            return ""
+        case .integer(let int):
+            return "\(int)"
+        case .smallint(let int):
+            return "\(int)"
+        case .real(let double):
+            return "\(double)"
+        case .float(let float):
+            return "\(float)"
+        case .text(let string):
+            return string
+        case .uuid(let uuid):
+            return uuid.uuidString
+        case .data(let string):
+            return string
+        case .enumValue(let caseName):
+            return ".\(caseName)"
+        case .timestamp(let date):
+            return date.ISO8601Format()
+        case .array, .image:
+            return "<DATA>"
         }
     }
-
-    func updateRecord(id: UUID, columnName: String, to newValue: Value) {
-        // Find the index of the current record
-        if var record = records.first(where: { $0.id == id }) {
-            Task {
-                // Update the value the fetched record
-                record.values[columnName] = newValue
-
-                // Update in database
-                do {
-                    try await client.updateRecord(
-                        record,
-                        for: columnName,
-                        from: dataObject
-                    )
-                } catch let error as SQLiteError {
-                    self.error = error
-                    self.showAlert = true
+    
+    private func handleForeignKeyClick(
+        foreignKey: SQLiteColumn.ForeignKey,
+        value: Value,
+        callback: @escaping (T, String, Value) -> Void
+    ) {
+        // Find the related table
+        Task {
+            do {
+                // Get all tables to find the one referenced by the foreign key
+                let tables: [T]
+                
+                if dataObject is Model {
+                    tables = try await client.getModels() as? [T] ?? []
+                } else if dataObject is Entity {
+                    tables = try await client.getEntities() as? [T] ?? []
+                } else {
+                    tables = try await client.getTables() as? [T] ?? []
                 }
+                
+                // Find the referenced table
+                if let relatedTable = tables.first(where: { table in
+                    if let entity = table as? Entity {
+                        return entity.displayName == foreignKey.table
+                    }
+                    return table.name.uppercased() == "Z\(foreignKey.table.uppercased())" || 
+                           table.name == foreignKey.table
+                }) {
+                    await MainActor.run {
+                        callback(relatedTable, foreignKey.column, value)
+                    }
+                }
+            } catch {
+                print("Failed to load related table: \(error)")
             }
         }
     }
@@ -209,8 +304,23 @@ struct ContentView<T: SQLiteTable>: View {
 #Preview {
     @Previewable @State var searchText: String = ""
     @Previewable @State var refresh: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var addRecord: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var deleteRecords: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var saveRecords: PassthroughSubject<Void, Never> = .init()
+    @Previewable @State var isUtilityExpanded = false
+    @Previewable @State var selectedRecordsCount = 0
 
     let table = SQLiteTable(name: "test", columns: [], recordCount: 0)
 
-    ContentView(client: SQLiteClient(), searchText: $searchText, dataObject: table, refresh: refresh)
+    ContentView(
+        client: SQLiteClient(),
+        dataObject: table,
+        refreshPublisher: refresh,
+        addRecordPublisher: addRecord,
+        deleteRecordsPublisher: deleteRecords,
+        saveRecordsPublisher: saveRecords,
+        searchText: $searchText,
+        isUtilityExpanded: $isUtilityExpanded,
+        selectedRecordsCount: $selectedRecordsCount
+    )
 }

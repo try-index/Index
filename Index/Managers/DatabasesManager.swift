@@ -56,13 +56,22 @@ import SwiftUI
 
     // MARK: - Database Management
 
-    func addDatabase(from url: URL) {
-        let bookmark = try? url.bookmarkData(options: .withSecurityScope)
+    func addDatabase(from url: URL, readOnly: Bool = false, ignoreDataModel: Bool = false) {
+        // URL from NSOpenPanel is already security-scoped
+        // When user selects a file, they implicitly grant access to create related files
+        // (like SQLite WAL/SHM) in the same directory
+        let bookmark = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
 
         let database = Database(
             name: url.deletingPathExtension().lastPathComponent,
             filePath: url.path,
-            bookmark: bookmark
+            bookmark: bookmark,
+            readOnly: readOnly,
+            ignoreDataModel: ignoreDataModel
         )
 
         // Remove existing database with same path
@@ -82,6 +91,45 @@ import SwiftUI
     func updateLastOpened(for database: Database) {
         if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
             recentDatabases[index].lastOpened = Date()
+            saveDatabases()
+        }
+    }
+    
+    func updateBookmark(for database: Database, bookmark: Data) {
+        if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
+            recentDatabases[index].bookmark = bookmark
+            saveDatabases()
+        }
+    }
+    
+    func updateDirectoryBookmark(for database: Database, bookmark: Data) {
+        if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
+            recentDatabases[index].directoryBookmark = bookmark
+            saveDatabases()
+        }
+    }
+    
+    /// Finds an existing directory bookmark from another database in the same directory
+    func findExistingDirectoryBookmark(for database: Database) -> Data? {
+        let url = URL(fileURLWithPath: database.filePath)
+        let parentPath = url.deletingLastPathComponent().path
+        
+        // Look for another database in the same directory that has a directory bookmark
+        for db in recentDatabases where db.id != database.id {
+            let dbURL = URL(fileURLWithPath: db.filePath)
+            let dbParentPath = dbURL.deletingLastPathComponent().path
+            
+            if dbParentPath == parentPath, let bookmark = db.directoryBookmark {
+                return bookmark
+            }
+        }
+        
+        return nil
+    }
+
+    func updateReadOnly(for database: Database, readOnly: Bool) {
+        if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
+            recentDatabases[index].readOnly = readOnly
             saveDatabases()
         }
     }

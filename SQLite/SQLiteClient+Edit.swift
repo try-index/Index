@@ -3,7 +3,6 @@
 //  Index
 //
 //  Created by Axel Martinez on 6/3/25.
-//  Refactored to actor extension on 28/01/26.
 //
 
 import Foundation
@@ -42,15 +41,17 @@ extension SQLiteClient {
 
     func updateRecord(
         _ record: Record,
+        newRecord: Record,
         for columnName: String,
         from table: SQLiteTable
     ) async throws {
-        guard let value = record.values[columnName] else { return }
+        guard let value = newRecord.values[columnName] else { return }
 
         var update = try db
             .update(table.name)
             .set(columnName, to: sqlExpression(for: value))
 
+        // Use original record for WHERE clause so we match the row before the update
         if let whereExpression = buildWhereExpression(for: record, in: table) {
             update = update.where(whereExpression)
         }
@@ -79,7 +80,7 @@ extension SQLiteClient {
 
     private func sqlExpression(for value: Value) -> any SQLExpression {
         switch value {
-        case .null:
+        case .null, .undefined:
             return SQLLiteral.null
         case .smallint(let int16):
             return SQLLiteral.numeric("\(int16)")
@@ -91,6 +92,23 @@ extension SQLiteClient {
             return SQLLiteral.numeric("\(double)")
         case .text(let string):
             return SQLLiteral.string(string)
+        case .uuid(let uuid):
+            // Store UUID as BLOB with raw bytes
+            let uuidBytes = withUnsafePointer(to: uuid.uuid) {
+                Data(bytes: $0, count: MemoryLayout.size(ofValue: uuid.uuid))
+            }
+            return SQLBind(uuidBytes)
+        case .data(let string):
+            // Data is stored as string representation (read-only)
+            return SQLLiteral.string(string)
+        case .enumValue(let caseName):
+            // Try to parse as integer first (for Int-backed enums)
+            if let intValue = Int(caseName) {
+                return SQLLiteral.numeric("\(intValue)")
+            } else {
+                // Otherwise store as string (for String-backed enums)
+                return SQLLiteral.string(caseName)
+            }
         case .timestamp(let date):
             return SQLLiteral.numeric("\(date.timeIntervalSince1970)")
         case .array, .image:

@@ -3,12 +3,12 @@
 //  Index
 //
 //  Created by Axel Martinez on 13/11/24.
-//  Refactored to actor on 28/01/26.
 //
 
 import Foundation
 import SQLiteKit
 import CoreData
+import AppKit
 
 enum SQLiteClientError: LocalizedError {
     case noConnection
@@ -27,19 +27,15 @@ enum SQLiteClientError: LocalizedError {
 /// SQLite client for database operations.
 actor SQLiteClient {
     private var connection: SQLiteConnection?
-    private var _metadata: [String: Any]?
-    private var _model: NSManagedObjectModel?
+    private var securityScopedURL: URL?
+    private var securityScopedDirectoryURL: URL?
+    
+    var isReadOnly: Bool = false
+    var metadata: [String: Any]?
+    var model: NSManagedObjectModel?
     
     var isConnected: Bool {
         connection != nil && !(connection?.isClosed ?? true)
-    }
-    
-    var metadata: [String: Any]? {
-        _metadata
-    }
-    
-    var model: NSManagedObjectModel? {
-        _model
     }
     
     var db: any SQLDatabase {
@@ -55,63 +51,198 @@ actor SQLiteClient {
     init() {}
     
     deinit {
-        // Synchronous close for deinit - actor isolation means this is safe
         try? connection?.close().wait()
     }
     
-    func connect(to url: URL, readOnly: Bool = false) async throws {
+    func connect(
+        to url: URL,
+        bookmarkData: Data? = nil,
+        directoryBookmarkData: Data? = nil,
+        readOnly: Bool = false
+    ) async throws -> (fileBookmark: Data?, directoryBookmark: Data?) {
         var newConnection: SQLiteConnection
-
+        var connectionIsReadOnly = readOnly
+        var finalURL = url
+        var createdBookmark: Data? = nil
+        var createdDirectoryBookmark: Data? = nil
+        
+        // If we have bookmark data, resolve it and start accessing
+        if let bookmarkData = bookmarkData {
+            var isStale = false
+            do {
+                let resolvedURL = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: .withSecurityScope,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                
+                finalURL = resolvedURL
+                
+                // Start accessing file
+                let didStartAccessing = finalURL.startAccessingSecurityScopedResource()
+                if didStartAccessing {
+                    securityScopedURL = finalURL
+                }
+                
+                // If bookmark is stale, recreate it
+                if isStale {
+                    createdBookmark = try? finalURL.bookmarkData(
+                        options: .withSecurityScope,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
+                }
+            } catch {
+                // Bookmark resolution failed, will use provided URL
+            }
+        }
+        
+        // Also resolve and access parent directory bookmark for SQLite WAL/SHM files
+        if let directoryBookmarkData = directoryBookmarkData {
+            var isStale = false
+            do {
+                let resolvedDirURL = try URL(
+                    resolvingBookmarkData: directoryBookmarkData,
+                    options: .withSecurityScope,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                
+                // Start accessing directory
+                let didStartAccessingDirectory = resolvedDirURL.startAccessingSecurityScopedResource()
+                if didStartAccessingDirectory {
+                    securityScopedDirectoryURL = resolvedDirURL
+                }
+                
+                // If bookmark is stale, recreate it
+                if isStale {
+                    createdDirectoryBookmark = try? resolvedDirURL.bookmarkData(
+                        options: .withSecurityScope,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
+                }
+            } catch {
+                // Directory bookmark resolution failed
+            }
+        }
+        
         if readOnly {
-            let fileURI = "file:\(url.path)?immutable=1"
+            // Open in read-only mode if explicitly requested
+            let fileURI = "file:\(finalURL.path)?immutable=1"
+            
             newConnection = try await SQLiteConnection.open(
                 storage: .file(path: fileURI)
             )
+            
             _ = try await newConnection.query("PRAGMA quick_check")
+            connectionIsReadOnly = true
         } else {
+            // Try to open in write mode
             do {
-                let rwConnection = try await SQLiteConnection.open(
-                    storage: .file(path: url.path)
+                newConnection = try await SQLiteConnection.open(
+                    storage: .file(path: finalURL.path)
                 )
-                do {
-                    _ = try await rwConnection.query("PRAGMA quick_check")
-                    newConnection = rwConnection
-                } catch {
-                    try? await rwConnection.close()
-                    throw error
+                
+                _ = try await newConnection.query("PRAGMA quick_check")
+                connectionIsReadOnly = false
+                
+                // Create bookmarks for persistent access if we don't have them
+                if bookmarkData == nil && createdBookmark == nil {
+                    // URL is from NSOpenPanel (security-scoped) - create file bookmark
+                    createdBookmark = try? finalURL.bookmarkData(
+                        options: .withSecurityScope,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
+                }
+                
+                if directoryBookmarkData == nil && createdDirectoryBookmark == nil {
+                    // Create directory bookmark for WAL/SHM files
+                    let parentURL = finalURL.deletingLastPathComponent()
+                    createdDirectoryBookmark = try? parentURL.bookmarkData(
+                        options: .withSecurityScope,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
                 }
             } catch {
-                let fileURI = "file:\(url.path)?immutable=1"
+                // If write mode fails, fallback to read-only
+                let fileURI = "file:\(finalURL.path)?immutable=1"
+                
                 newConnection = try await SQLiteConnection.open(
                     storage: .file(path: fileURI)
                 )
+                
                 _ = try await newConnection.query("PRAGMA quick_check")
+                connectionIsReadOnly = true
             }
         }
-
+        
+        // Save references to old security-scoped resources before updating
+        let oldFileURL = securityScopedURL
+        let oldDirectoryURL = securityScopedDirectoryURL
+        
+        // Close old connection
         if let oldConnection = self.connection {
             try? await oldConnection.close()
         }
-
+        
+        // Update connection and security-scoped URLs
         self.connection = newConnection
-
-        // Load metadata and model for Core Data stores using the open connection
-        if url.pathExtension == "store" {
-            _metadata = await loadMetadata()
-            _model = await loadModelCache()
-        } else {
-            _metadata = nil
-            _model = nil
+        self.isReadOnly = connectionIsReadOnly
+        
+        // Stop accessing old file URL if it's different from the new one
+        if let oldURL = oldFileURL, oldURL != finalURL {
+            oldURL.stopAccessingSecurityScopedResource()
         }
+        
+        // Stop accessing old directory URL ONLY if it's different from the new one
+        // This prevents stopping and restarting access to the same directory
+        if let oldDirURL = oldDirectoryURL {
+            // Check if we have a new directory URL
+            if let newDirURL = securityScopedDirectoryURL {
+                // Only stop if they're different
+                if oldDirURL != newDirURL {
+                    oldDirURL.stopAccessingSecurityScopedResource()
+                }
+            } else {
+                // No new directory, stop the old one
+                oldDirURL.stopAccessingSecurityScopedResource()
+            }
+        }
+        
+        // Load metadata and model for Core Data stores using the open connection
+        if finalURL.pathExtension == "store" {
+            metadata = await loadMetadata()
+            model = await loadModelCache()
+        } else {
+            metadata = nil
+            model = nil
+        }
+        
+        return (createdBookmark, createdDirectoryBookmark)
     }
-
-
+    
     func close() async throws {
         try await connection?.close()
         
+        // Stop accessing security-scoped resources
+        if let url = securityScopedURL {
+            url.stopAccessingSecurityScopedResource()
+            securityScopedURL = nil
+        }
+        
+        if let dirURL = securityScopedDirectoryURL {
+            dirURL.stopAccessingSecurityScopedResource()
+            securityScopedDirectoryURL = nil
+        }
+        
         connection = nil
-        _metadata = nil
-        _model = nil
+        metadata = nil
+        model = nil
+        isReadOnly = false
     }
     
     private func loadMetadata() async -> [String: Any]? {
@@ -136,7 +267,6 @@ actor SQLiteClient {
             return nil
         }
     }
-    
     
     private func loadModelCache() async -> NSManagedObjectModel? {
         do {

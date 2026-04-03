@@ -20,11 +20,6 @@ struct FileMenu: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(fileURL.path, forType: .string)
             }
-
-            Divider()
-
-            Text(fileURL.deletingLastPathComponent().path)
-                .truncationMode(.middle)
         }
         .padding()
         .help(fileURL.path)

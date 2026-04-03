@@ -1,32 +1,41 @@
 //
-//  DatabaseView.swift
+//  ContentView.swift
 //  Index
 //
 //  Created by Axel Martinez on 13/11/24.
 //
 
 import Combine
+import SQLiteKit
 import SwiftUI
 
 struct DatabaseView<T: SQLiteTable>: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) var dismiss
+    @Environment(\.openWindow) var openWindow
     @Environment(DatabasesManager.self) var databasesManager
     @Environment(SimulatorsManager.self) var simManager
-
+    
     let database: Database
     
-    @State private var client = SQLiteClient()
-    @State private var accessedFolderURL: URL?
-    @State private var databaseError: String?
-    @State private var displayMode: DisplayMode = .SQLite
-    @State private var isFileMenuVisible: Bool = false
-    @State private var showDatabaseError = false
-    @State private var isConnected = false
+    @State var tabs: [TabItem<T>] = []
+    @State var selectedTab: TabItem<T>?
+    @State var client = SQLiteClient()
+    @State var databaseError: String?
+    @State var showDatabaseError = false
+    @State var displayMode: DisplayMode = .SQLite
+    @State var isConnected = false
+    @State var isReadOnly = false
+    
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var selectedTable: T?
     @State private var searchText: String = ""
-    @State private var refreshContent: PassthroughSubject<Void, Never> = .init()
+    @State private var selectedRecordsCount = 0
+    @State private var isFileMenuVisible = false
+    @State private var isUtilityExpanded = false
+    @State private var refreshContentPublisher: PassthroughSubject<Void, Never> = .init()
+    @State private var addRecordPublisher: PassthroughSubject<Void, Never> = .init()
+    @State private var deleteRecordsPublisher: PassthroughSubject<Void, Never> = .init()
+    @State private var saveRecordsPublisher: PassthroughSubject<Void, Never> = .init()
     
     var fileURL: URL {
         URL(filePath: database.filePath)
@@ -39,21 +48,61 @@ struct DatabaseView<T: SQLiteTable>: View {
                     DatabaseSidebar(
                         client: client,
                         displayMode: displayMode,
-                        selection: $selectedTable
+                        selection: $selectedTable,
+                        onOpenInNewTab: { table in
+                            openTab(for: table, forceNewTab: true)
+                        }
                     )
                 } detail: {
-                    if let selectedTable = selectedTable {
-                        ContentView(
-                            client: client,
-                            searchText: $searchText,
-                            dataObject: selectedTable,
-                            refresh: refreshContent
-                        )
-                    } else {
-                        ContentUnavailableView {
-                            Label("Select a Table", systemImage: "tablecells")
-                        } description: {
-                            Text("Choose a table from the sidebar to view its contents.")
+                    VStack(spacing: 0) {
+                        // Custom tab bar
+                        if tabs.count > 1 {
+                            TabBar(
+                                tabs: tabs,
+                                selectedTab: $selectedTab,
+                                tabTitle: { $0.title },
+                                onClose: closeTab
+                            )
+                        }
+                        
+                        // Tab content
+                        if let selectedTab = selectedTab {
+                            VStack(spacing: 0) {
+                                ContentView(
+                                    client: client,
+                                    dataObject: selectedTab.table,
+                                    refreshPublisher: refreshContentPublisher,
+                                    addRecordPublisher: addRecordPublisher,
+                                    deleteRecordsPublisher: deleteRecordsPublisher,
+                                    saveRecordsPublisher: saveRecordsPublisher,
+                                    filterColumn: selectedTab.filterColumn,
+                                    filterValue: selectedTab.filterValue,
+                                    onOpenRelatedTable: openRelatedTable,
+                                    searchText: $searchText,
+                                    isUtilityExpanded: $isUtilityExpanded,
+                                    selectedRecordsCount: $selectedRecordsCount,
+                                    isReadOnly: isReadOnly,
+                                    displayMode: displayMode
+                                )
+                                
+                                // Utility drawer
+                                UtilityView(
+                                    sqlQuery: selectedTab.sqlQuery,
+                                    isExpanded: $isUtilityExpanded
+                                )
+                            }
+                        } else if selectedTable != nil {
+                            ContentUnavailableView {
+                                Label("No Tabs Open", systemImage: "square.stack.3d.up.slash")
+                            } description: {
+                                Text("Click on a table in the sidebar to open it.")
+                            }
+                        } else {
+                            ContentUnavailableView {
+                                Label("Select a Table", systemImage: "tablecells")
+                            } description: {
+                                Text("Choose a table from the sidebar to view its contents.")
+                            }
                         }
                     }
                 }
@@ -63,7 +112,12 @@ struct DatabaseView<T: SQLiteTable>: View {
                         Button {
                             isFileMenuVisible.toggle()
                         } label: {
-                            Text(fileURL.lastPathComponent)
+                            HStack(spacing: 4) {
+                                Text(fileURL.lastPathComponent)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .popover(isPresented: $isFileMenuVisible, arrowEdge: .bottom, content: {
                             FileMenu(fileURL: fileURL)
@@ -73,10 +127,39 @@ struct DatabaseView<T: SQLiteTable>: View {
                     }
                     
                     ToolbarItem(placement: .primaryAction) {
-                        Button("", systemImage: "arrow.clockwise", action: {
-                            refreshContent.send()
-                        })
-                        .disabled(self.selectedTable == nil)
+                        HStack(spacing: 8) {
+                            if isReadOnly {
+                                Text("READ ONLY")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary)
+                                    .clipShape(Capsule())
+                                    .padding(.leading, 8)
+                            } else {
+                                Button("", systemImage: "plus", action: {
+                                    addRecordPublisher.send()
+                                })
+                                .disabled(selectedTab == nil)
+                                .help("Add Record")
+                                
+                                Button("", systemImage: "trash", action: {
+                                    deleteRecordsPublisher.send()
+                                })
+                                .disabled(selectedRecordsCount == 0)
+                                .help("Delete Selected Records (\(selectedRecordsCount))")
+                            }
+                            
+                            Divider()
+                                .frame(height: 16)
+                            
+                            Button("", systemImage: "arrow.clockwise", action: {
+                                refreshContentPublisher.send()
+                            })
+                            .disabled(self.selectedTable == nil)
+                            .help("Refresh")
+                        }
                     }
                 }
             } else {
@@ -85,11 +168,18 @@ struct DatabaseView<T: SQLiteTable>: View {
             }
         }
         .navigationTitle("")
-        .onAppear {
-            openDatabase()
+        .task {
+            await openDatabase()
         }
         .onDisappear {
-            closeDatabase()
+            Task {
+                await closeDatabase()
+            }
+        }
+        .onChange(of: selectedTable) { _, newTable in
+            if let newTable = newTable {
+                openTab(for: newTable)
+            }
         }
         .alert("Database Error", isPresented: $showDatabaseError) {
             Button("Close") {
@@ -99,81 +189,16 @@ struct DatabaseView<T: SQLiteTable>: View {
             Text(databaseError ?? "Failed to open the database file.")
         }
     }
-    
-    // MARK: - Connection
-    
-    private func openDatabase() {
-        guard let url = databasesManager.resolveURL(for: database) else {
-            databaseError = "Could not access the file. It may have been moved or deleted."
-            showDatabaseError = true
-            return
-        }
-        
-        Task {
-            guard url.startAccessingSecurityScopedResource() else {
-                await MainActor.run {
-                    databaseError = "Could not access the file. Permission denied."
-                    showDatabaseError = true
-                }
-                return
-            }
-            
-            accessedFolderURL = url
-            
-            do {
-                try await client.connect(to: url)
-                
-                databasesManager.updateLastOpened(for: database)
-                
-                let mode = await configureDisplayMode()
-                
-                await MainActor.run {
-                    displayMode = mode
-                    isConnected = true
-                }
-            } catch {
-                await MainActor.run {
-                    databaseError = error.localizedDescription
-                    showDatabaseError = true
-                }
-            }
-            
-            accessedFolderURL?.stopAccessingSecurityScopedResource()
-        }
-    }
-    
-    private func closeDatabase() {
-        accessedFolderURL?.stopAccessingSecurityScopedResource()
-        
-        Task {
-            try? await client.close()
-        }
-        
-        // Check if this is the last database window closing
-        // Count windows that are not the "Databases" window and not closing
-        let databaseWindows = NSApp.windows.filter { window in
-            window.title != "Databases" && window.isVisible
-        }
-        
-        // If only one database window left (this one), show the databases window
-        if databaseWindows.count <= 1 {
-            openWindow(id: "databases")
-        }
-    }
-    
-    private func configureDisplayMode() async -> DisplayMode {
-        guard let metadata = await client.metadata,
-              let version = metadata["NSPersistenceFrameworkVersion"] as? Int else {
-            return .SQLite
-        }
-        
-        return version > 800 ? .SwiftData : .CoreData
-    }
 }
 
+
 #Preview {
-    /*DatabaseView<SQLiteTable>(
-     database: Database(),
-     fileURL: URL(fileURLWithPath: "test")
-     )*/
+    DatabaseView<SQLiteTable>(
+        database: Database(
+            name: "Sample Database",
+            filePath: "/path/to/sample.db"
+        )
+    )
+    .environment(DatabasesManager())
+    .environment(SimulatorsManager())
 }

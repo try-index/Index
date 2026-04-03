@@ -38,7 +38,10 @@ struct Database: Identifiable, Codable, Hashable {
     let dateAdded: Date
     var lastOpened: Date
     var bookmark: Data?
+    var directoryBookmark: Data? // Optional: only created if user grants explicit directory access
     var groupId: UUID?
+    var readOnly: Bool // Whether to open this database in read-only mode
+    var ignoreDataModel: Bool // Whether to open as plain SQLite instead of CoreData/SwiftData
 
     init(
         id: UUID = UUID(),
@@ -47,7 +50,10 @@ struct Database: Identifiable, Codable, Hashable {
         dateAdded: Date = Date(),
         lastOpened: Date = Date(),
         bookmark: Data? = nil,
-        groupId: UUID? = nil
+        directoryBookmark: Data? = nil,
+        groupId: UUID? = nil,
+        readOnly: Bool = false,
+        ignoreDataModel: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -55,7 +61,10 @@ struct Database: Identifiable, Codable, Hashable {
         self.dateAdded = dateAdded
         self.lastOpened = lastOpened
         self.bookmark = bookmark
+        self.directoryBookmark = directoryBookmark
         self.groupId = groupId
+        self.readOnly = readOnly
+        self.ignoreDataModel = ignoreDataModel
     }
 
     var displayName: String {

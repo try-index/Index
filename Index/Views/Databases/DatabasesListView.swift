@@ -9,7 +9,7 @@ import SwiftUI
 
 struct DatabasesListView: View {
     @Environment(DatabasesManager.self) var databasesManager
-    
+
     let databases: [Database]
     let onOpen: (Database) -> Void
     let onRemove: (Database) -> Void
@@ -31,7 +31,8 @@ struct DatabasesListView: View {
         }
         .contextMenu(forSelectionType: Database.ID.self) { selectedIDs in
             if let id = selectedIDs.first,
-               let database = databases.first(where: { $0.id == id }) {
+                let database = databases.first(where: { $0.id == id })
+            {
                 Button("Open") {
                     onOpen(database)
                 }
@@ -63,7 +64,8 @@ struct DatabasesListView: View {
             }
         } primaryAction: { selectedIDs in
             if let id = selectedIDs.first,
-               let database = databases.first(where: { $0.id == id }) {
+                let database = databases.first(where: { $0.id == id })
+            {
                 onOpen(database)
             }
         }

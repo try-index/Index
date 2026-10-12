@@ -14,8 +14,8 @@ struct ContentView<T: SQLiteTable>: View {
 
     @State var records = [Record]()
     @State var selectedRecords = Set<UUID>()
-    @State var newRecords = [Record]() // Temporary unsaved records
-    @State var editingRecordId: UUID? // Track which record is being edited
+    @State var newRecords = [Record]()  // Temporary unsaved records
+    @State var editingRecordId: UUID?  // Track which record is being edited
     @State var error: SQLiteError? = nil
     @State var showAlert = false
     @State var properties = [Property]()
@@ -33,36 +33,38 @@ struct ContentView<T: SQLiteTable>: View {
     var filterColumn: String?
     var filterValue: Value?
     var onOpenRelatedTable: ((T, String, Value) -> Void)?
-    
+
     @Binding var searchText: String
     @Binding var isUtilityExpanded: Bool
     @Binding var selectedRecordsCount: Int
-    
+
     var isReadOnly: Bool = false
-    var displayMode: DisplayMode = .SQLite
+    var displayMode: DisplayMode = .sqlite
 
     var filteredRecords: [Record] {
         // Combine new records with existing records (new records at the bottom)
         let allRecords = records + newRecords
-        
+
         return allRecords.filter({ record in
             // Apply column filter if specified
             if let filterColumn = filterColumn, let filterValue = filterValue {
                 guard let recordValue = record.values[filterColumn],
-                      recordValue == filterValue else {
+                    recordValue == filterValue
+                else {
                     return false
                 }
             }
-            
+
             // Apply search text filter
-            return self.searchText.isEmpty || record.values.contains(where: {
-                switch($0.value){
-                case .text(let text):
-                    return text.contains(self.searchText)
-                default:
-                    return false
-                }
-            })
+            return self.searchText.isEmpty
+                || record.values.contains(where: {
+                    switch $0.value {
+                    case .text(let text):
+                        return text.contains(self.searchText)
+                    default:
+                        return false
+                    }
+                })
         })
     }
 
@@ -95,15 +97,17 @@ struct ContentView<T: SQLiteTable>: View {
                         onUpdate: { recordId, columnName, newValue in
                             updateRecord(id: recordId, columnName: columnName, to: newValue)
                         },
-                        onForeignKeyClick: onOpenRelatedTable != nil ? { fk, value, record in
-                            handleForeignKeyClick(foreignKey: fk, value: value, callback: onOpenRelatedTable!)
-                        } : nil,
+                        onForeignKeyClick: onOpenRelatedTable.map { callback in
+                            { fk, value, record in
+                                handleForeignKeyClick(foreignKey: fk, value: value, callback: callback)
+                            }
+                        },
                         onRowDeselected: { recordId in
                             // Only validate when the entire row is deselected (user clicked away)
                             if newRecords.contains(where: { $0.id == recordId }) {
                                 validateAndSaveOrRemoveRecord(recordId)
                             }
-                            
+
                             editingRecordId = nil
                         },
                         onEnterPressed: { recordId in
@@ -113,7 +117,7 @@ struct ContentView<T: SQLiteTable>: View {
                             }
                         }
                     )
-                    
+
                     StatusBar(
                         recordCount: records.count,
                         filteredCount: filteredRecords.count,
@@ -151,7 +155,7 @@ struct ContentView<T: SQLiteTable>: View {
             } else {
                 // Provide context-appropriate recovery suggestions
                 let errorMessage = error.localizedDescription.lowercased()
-                
+
                 if errorMessage.contains("constraint") {
                     Text("This change violates a database constraint. Check foreign key references or unique constraints.")
                 } else if errorMessage.contains("readonly") || errorMessage.contains("read-only") {
@@ -164,7 +168,7 @@ struct ContentView<T: SQLiteTable>: View {
             }
         }
         .alert("Delete Records", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
                 deleteRecords()
             }
@@ -173,15 +177,16 @@ struct ContentView<T: SQLiteTable>: View {
         }
         .onKeyPress { event in
             // Check for Escape key to cancel new record creation
-            if event.key == .escape, let editingId = editingRecordId, 
-               newRecords.contains(where: { $0.id == editingId }) {
+            if event.key == .escape, let editingId = editingRecordId,
+                newRecords.contains(where: { $0.id == editingId })
+            {
                 // Remove the new record being edited
                 newRecords.removeAll { $0.id == editingId }
                 selectedRecords.remove(editingId)
                 editingRecordId = nil
                 return .handled
             }
-            
+
             // Check for Command+S to save new records (only in editable mode)
             if event.key == "s" && event.modifiers.contains(.command) && !isReadOnly && !newRecords.isEmpty {
                 saveNewRecords()
@@ -193,7 +198,7 @@ struct ContentView<T: SQLiteTable>: View {
 
     func refreshRecords() {
         isLoading = true
-        
+
         Task(priority: .userInitiated) {
             do {
                 var loadedProperties = [Property]()
@@ -226,7 +231,7 @@ struct ContentView<T: SQLiteTable>: View {
                 }
             } catch {
                 print("Failed to load records: \(error)")
-                
+
                 await MainActor.run {
                     self.isLoading = false
                 }
@@ -262,7 +267,7 @@ struct ContentView<T: SQLiteTable>: View {
             return "<DATA>"
         }
     }
-    
+
     private func handleForeignKeyClick(
         foreignKey: SQLiteColumn.ForeignKey,
         value: Value,
@@ -273,7 +278,7 @@ struct ContentView<T: SQLiteTable>: View {
             do {
                 // Get all tables to find the one referenced by the foreign key
                 let tables: [T]
-                
+
                 if dataObject is Model {
                     tables = try await client.getModels() as? [T] ?? []
                 } else if dataObject is Entity {
@@ -281,14 +286,13 @@ struct ContentView<T: SQLiteTable>: View {
                 } else {
                     tables = try await client.getTables() as? [T] ?? []
                 }
-                
+
                 // Find the referenced table
                 if let relatedTable = tables.first(where: { table in
                     if let entity = table as? Entity {
                         return entity.displayName == foreignKey.table
                     }
-                    return table.name.uppercased() == "Z\(foreignKey.table.uppercased())" || 
-                           table.name == foreignKey.table
+                    return table.name.uppercased() == "Z\(foreignKey.table.uppercased())" || table.name == foreignKey.table
                 }) {
                     await MainActor.run {
                         callback(relatedTable, foreignKey.column, value)

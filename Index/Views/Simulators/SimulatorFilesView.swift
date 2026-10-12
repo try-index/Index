@@ -26,7 +26,7 @@ struct SimulatorFilesView: View {
             } else if applications.isEmpty {
                 ContentUnavailableView("No database files found", image: "database.xmark")
             } else {
-               List(selection: $selectedFileInfo) {
+                List(selection: $selectedFileInfo) {
                     ForEach(applications) { appInfo in
                         ForEach(appInfo.fileURLs, id: \.self) { fileUrl in
                             HStack {
@@ -36,7 +36,7 @@ struct SimulatorFilesView: View {
                             }
                             .tag(FileInfo(url: fileUrl, appInfo: appInfo))
                         }
-                   }
+                    }
                 }
                 .contextMenu(forSelectionType: FileInfo.self, menu: { _ in }) { fileSet in
                     if let file = fileSet.first {

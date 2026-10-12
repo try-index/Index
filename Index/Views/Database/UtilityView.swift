@@ -9,21 +9,21 @@ import SwiftUI
 
 struct UtilityView: View {
     let sqlQuery: String?
-    
+
     @Binding var isExpanded: Bool
     @State private var consoleHeight: CGFloat = 150
     @State private var isDragging: Bool = false
-    
+
     private let minHeight: CGFloat = 80
     private let maxHeight: CGFloat = 500
-    
+
     var body: some View {
         if isExpanded {
             VStack(spacing: 0) {
                 // Drag handle
                 ZStack {
                     Divider()
-                    
+
                     // Visible drag indicator
                     HStack {
                         Spacer()
@@ -55,22 +55,22 @@ struct UtilityView: View {
                         NSCursor.pop()
                     }
                 }
-                
+
                 // Header
                 HStack {
                     Image(systemName: "terminal")
                         .foregroundStyle(.secondary)
-                    
+
                     Text("SQL Query")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(.ultraThinMaterial)
-                
+
                 // SQL content
                 ScrollView {
                     Text(sqlQuery ?? "No query available")
@@ -88,7 +88,7 @@ struct UtilityView: View {
 
 #Preview {
     @Previewable @State var isExpanded = true
-    
+
     UtilityView(
         sqlQuery: "SELECT * FROM users WHERE id = 1;",
         isExpanded: $isExpanded

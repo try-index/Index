@@ -18,7 +18,7 @@ struct DatabaseRow: View {
     private var lastOpenedText: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        
+
         return formatter.localizedString(for: database.lastOpened, relativeTo: Date())
     }
 

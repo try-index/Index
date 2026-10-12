@@ -11,11 +11,11 @@ struct Simulator: Identifiable, Hashable, Comparable {
     var id: String {
         url.path()
     }
-    
+
     let name: String
     let runtime: String
     let url: URL
-    
+
     static func < (lhs: Simulator, rhs: Simulator) -> Bool {
         lhs.name < rhs.name
     }

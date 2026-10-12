@@ -15,9 +15,9 @@ struct StatusBar: View {
     let unsavedCount: Int
     var isReadOnly: Bool = false
     var saveRecords: PassthroughSubject<Void, Never>
-    
+
     @Binding var isUtilityExpanded: Bool
-    
+
     var body: some View {
         HStack(spacing: 16) {
 
@@ -27,7 +27,7 @@ struct StatusBar: View {
                     .font(.system(size: 11))
             }
             .foregroundStyle(.secondary)
-            
+
             // Unsaved records indicator (only in editable mode)
             if !isReadOnly && unsavedCount > 0 {
                 HStack(spacing: 4) {
@@ -38,7 +38,7 @@ struct StatusBar: View {
                         .font(.system(size: 11))
                 }
                 .foregroundStyle(.secondary)
-                
+
                 Button {
                     saveRecords.send()
                 } label: {
@@ -48,9 +48,9 @@ struct StatusBar: View {
                 .buttonStyle(.plain)
                 .help("Save unsaved records (⌘S)")
             }
-            
+
             Spacer()
-            
+
             // SQL Console toggle button
             Button {
                 withAnimation(.snappy(duration: 0.2)) {
@@ -73,7 +73,7 @@ struct StatusBar: View {
 #Preview {
     @Previewable @State var isExpanded = false
     @Previewable @State var saveRecords: PassthroughSubject<Void, Never> = .init()
-    
+
     StatusBar(
         recordCount: 150,
         filteredCount: 150,

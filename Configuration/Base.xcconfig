@@ -1,0 +1,2 @@
+// Signing settings live in the untracked Local.xcconfig; copy Local.xcconfig.example to create it.
+#include? "Local.xcconfig"

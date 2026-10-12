@@ -38,10 +38,10 @@ struct Database: Identifiable, Codable, Hashable {
     let dateAdded: Date
     var lastOpened: Date
     var bookmark: Data?
-    var directoryBookmark: Data? // Optional: only created if user grants explicit directory access
+    var directoryBookmark: Data?  // Optional: only created if user grants explicit directory access
     var groupId: UUID?
-    var readOnly: Bool // Whether to open this database in read-only mode
-    var ignoreDataModel: Bool // Whether to open as plain SQLite instead of CoreData/SwiftData
+    var readOnly: Bool  // Whether to open this database in read-only mode
+    var ignoreDataModel: Bool  // Whether to open as plain SQLite instead of CoreData/SwiftData
 
     init(
         id: UUID = UUID(),
@@ -78,4 +78,3 @@ struct Database: Identifiable, Codable, Hashable {
         URL(fileURLWithPath: filePath).pathExtension.lowercased()
     }
 }
-

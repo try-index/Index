@@ -10,9 +10,9 @@ import Foundation
 enum TabBehavior: String, CaseIterable, Identifiable {
     case reuseCurrentTab = "reuse"
     case alwaysNewTab = "new"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .reuseCurrentTab:
@@ -21,7 +21,7 @@ enum TabBehavior: String, CaseIterable, Identifiable {
             return "Always Open in New Tab"
         }
     }
-    
+
     var description: String {
         switch self {
         case .reuseCurrentTab:
@@ -36,12 +36,13 @@ extension UserDefaults {
     private enum Keys {
         static let tabBehavior = "tabBehavior"
     }
-    
+
     var tabBehavior: TabBehavior {
         get {
             guard let rawValue = string(forKey: Keys.tabBehavior),
-                  let behavior = TabBehavior(rawValue: rawValue) else {
-                return .reuseCurrentTab // Default behavior
+                let behavior = TabBehavior(rawValue: rawValue)
+            else {
+                return .reuseCurrentTab  // Default behavior
             }
             return behavior
         }

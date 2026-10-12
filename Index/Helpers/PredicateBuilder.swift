@@ -10,7 +10,7 @@ import Foundation
 class PredicateBuilder {
     /*static func build(_ predicate: String) -> Predicate<Any> {
         let record: any PredicateExpression
-        
+
         return PredicateExpressions.build_Conjunction(
             lhs: PredicateExpressions.build_contains(
                 PredicateExpressions.build_KeyPath(

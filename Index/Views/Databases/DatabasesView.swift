@@ -50,8 +50,7 @@ struct DatabasesView: View {
             return baseDatabases
         }
         return baseDatabases.filter {
-            $0.displayName.localizedCaseInsensitiveContains(searchText) ||
-            $0.filePath.localizedCaseInsensitiveContains(searchText)
+            $0.displayName.localizedCaseInsensitiveContains(searchText) || $0.filePath.localizedCaseInsensitiveContains(searchText)
         }
     }
 

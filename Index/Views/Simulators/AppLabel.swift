@@ -9,7 +9,7 @@ import SwiftUI
 
 struct AppLabel: View {
     let appInfo: AppInfo
-    
+
     var body: some View {
         Label {
             Text(appInfo.name)

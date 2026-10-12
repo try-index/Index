@@ -14,18 +14,18 @@ struct DatabaseView<T: SQLiteTable>: View {
     @Environment(\.openWindow) var openWindow
     @Environment(DatabasesManager.self) var databasesManager
     @Environment(SimulatorsManager.self) var simManager
-    
+
     let database: Database
-    
+
     @State var tabs: [TabItem<T>] = []
     @State var selectedTab: TabItem<T>?
     @State var client = SQLiteClient()
     @State var databaseError: String?
     @State var showDatabaseError = false
-    @State var displayMode: DisplayMode = .SQLite
+    @State var displayMode: DisplayMode = .sqlite
     @State var isConnected = false
     @State var isReadOnly = false
-    
+
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var selectedTable: T?
     @State private var searchText: String = ""
@@ -36,11 +36,11 @@ struct DatabaseView<T: SQLiteTable>: View {
     @State private var addRecordPublisher: PassthroughSubject<Void, Never> = .init()
     @State private var deleteRecordsPublisher: PassthroughSubject<Void, Never> = .init()
     @State private var saveRecordsPublisher: PassthroughSubject<Void, Never> = .init()
-    
+
     var fileURL: URL {
         URL(filePath: database.filePath)
     }
-    
+
     var body: some View {
         Group {
             if isConnected {
@@ -64,7 +64,7 @@ struct DatabaseView<T: SQLiteTable>: View {
                                 onClose: closeTab
                             )
                         }
-                        
+
                         // Tab content
                         if let selectedTab = selectedTab {
                             VStack(spacing: 0) {
@@ -84,7 +84,7 @@ struct DatabaseView<T: SQLiteTable>: View {
                                     isReadOnly: isReadOnly,
                                     displayMode: displayMode
                                 )
-                                
+
                                 // Utility drawer
                                 UtilityView(
                                     sqlQuery: selectedTab.sqlQuery,
@@ -119,13 +119,15 @@ struct DatabaseView<T: SQLiteTable>: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .popover(isPresented: $isFileMenuVisible, arrowEdge: .bottom, content: {
-                            FileMenu(fileURL: fileURL)
-                                .frame(minWidth: 200,  maxWidth: 400, minHeight: 100)
-                                .presentationCompactAdaptation(.popover)
-                        })
+                        .popover(
+                            isPresented: $isFileMenuVisible, arrowEdge: .bottom,
+                            content: {
+                                FileMenu(fileURL: fileURL)
+                                    .frame(minWidth: 200, maxWidth: 400, minHeight: 100)
+                                    .presentationCompactAdaptation(.popover)
+                            })
                     }
-                    
+
                     ToolbarItem(placement: .primaryAction) {
                         HStack(spacing: 8) {
                             if isReadOnly {
@@ -138,25 +140,34 @@ struct DatabaseView<T: SQLiteTable>: View {
                                     .clipShape(Capsule())
                                     .padding(.leading, 8)
                             } else {
-                                Button("", systemImage: "plus", action: {
-                                    addRecordPublisher.send()
-                                })
+                                Button(
+                                    "", systemImage: "plus",
+                                    action: {
+                                        addRecordPublisher.send()
+                                    }
+                                )
                                 .disabled(selectedTab == nil)
                                 .help("Add Record")
-                                
-                                Button("", systemImage: "trash", action: {
-                                    deleteRecordsPublisher.send()
-                                })
+
+                                Button(
+                                    "", systemImage: "trash",
+                                    action: {
+                                        deleteRecordsPublisher.send()
+                                    }
+                                )
                                 .disabled(selectedRecordsCount == 0)
                                 .help("Delete Selected Records (\(selectedRecordsCount))")
                             }
-                            
+
                             Divider()
                                 .frame(height: 16)
-                            
-                            Button("", systemImage: "arrow.clockwise", action: {
-                                refreshContentPublisher.send()
-                            })
+
+                            Button(
+                                "", systemImage: "arrow.clockwise",
+                                action: {
+                                    refreshContentPublisher.send()
+                                }
+                            )
                             .disabled(self.selectedTable == nil)
                             .help("Refresh")
                         }
@@ -190,7 +201,6 @@ struct DatabaseView<T: SQLiteTable>: View {
         }
     }
 }
-
 
 #Preview {
     DatabaseView<SQLiteTable>(

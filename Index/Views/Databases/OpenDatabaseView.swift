@@ -101,30 +101,30 @@ struct OpenDatabaseView: View {
 
         let readOnlyCheckbox = NSButton(checkboxWithTitle: "Open Read-Only", target: nil, action: nil)
         readOnlyCheckbox.state = .off
-        
+
         let rawSQLCheckbox = NSButton(checkboxWithTitle: "Open as SQLite database", target: nil, action: nil)
         rawSQLCheckbox.state = .off
-        
+
         let stackView = NSStackView(views: [readOnlyCheckbox, rawSQLCheckbox])
         stackView.orientation = .vertical
         stackView.alignment = .leading
         stackView.spacing = 6
-        
+
         // Wrap in a container with padding
         let container = NSView()
         container.translatesAutoresizingMaskIntoConstraints = false
         stackView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stackView)
-        
+
         NSLayoutConstraint.activate([
             stackView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             stackView.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
-            stackView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12)
+            stackView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12),
         ])
-        
+
         panel.accessoryView = container
         panel.isAccessoryViewDisclosed = true
-        
+
         // Hide the disclosure "Options" button
         DispatchQueue.main.async {
             if let contentView = panel.contentView {
@@ -137,11 +137,12 @@ struct OpenDatabaseView: View {
             onFileSelected(url, readOnlyCheckbox.state == .on, rawSQLCheckbox.state == .on)
         }
     }
-    
+
     private static func hideDisclosureButton(in view: NSView) {
         for subview in view.subviews {
             if let button = subview as? NSButton,
-               button.bezelStyle == .disclosure {
+                button.bezelStyle == .disclosure
+            {
                 button.isHidden = true
                 return
             }
@@ -149,4 +150,3 @@ struct OpenDatabaseView: View {
         }
     }
 }
-

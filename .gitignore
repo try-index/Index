@@ -1,8 +1,8 @@
 .DS_Store
-
-### Xcode ###
-## User settings
 xcuserdata/
+DerivedData/
+.claude
+Configuration/Local.xcconfig
 
 ### Xcode Patch ###
 *.xcodeproj/*
@@ -12,6 +12,3 @@ xcuserdata/
 !*.xcworkspace/contents.xcworkspacedata
 /*.gcno
 **/xcshareddata/WorkspaceSettings.xcsettings
-
-### Claude Code ###
- .claude/

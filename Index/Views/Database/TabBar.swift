@@ -9,12 +9,12 @@ import SwiftUI
 
 struct TabBar<Item: Identifiable & Equatable>: View {
     let tabs: [Item]
-    
+
     @Binding var selectedTab: Item?
-    
+
     let tabTitle: (Item) -> String
     let onClose: (Item) -> Void
-    
+
     var body: some View {
         HStack(alignment: .center, spacing: 1) {
             ForEach(tabs) { tab in
@@ -48,9 +48,9 @@ private struct TabItemView<Item: Identifiable>: View {
     let title: String
     let onSelect: () -> Void
     let onClose: () -> Void
-    
+
     @State private var isHovering = false
-    
+
     var body: some View {
         ZStack(alignment: .leading) {
 
@@ -107,15 +107,15 @@ private struct TabItemView<Item: Identifiable>: View {
         let id = UUID()
         let title: String
     }
-    
+
     struct PreviewWrapper: View {
         @State private var tabs = [
             PreviewItem(title: "Table 1"),
             PreviewItem(title: "Table 2"),
-            PreviewItem(title: "Table 3")
+            PreviewItem(title: "Table 3"),
         ]
         @State private var selectedTab: PreviewItem?
-        
+
         var body: some View {
             VStack(spacing: 0) {
                 TabBar(
@@ -131,7 +131,7 @@ private struct TabItemView<Item: Identifiable>: View {
                         }
                     }
                 )
-                
+
                 Spacer()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(nsColor: .windowBackgroundColor))
@@ -142,6 +142,6 @@ private struct TabItemView<Item: Identifiable>: View {
             }
         }
     }
-    
+
     return PreviewWrapper()
 }

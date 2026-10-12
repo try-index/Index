@@ -15,7 +15,7 @@ struct DatabaseOptionButton: View {
     let action: () -> Void
 
     var badge: String? = nil
-    
+
     @State private var isHovered = false
 
     var body: some View {

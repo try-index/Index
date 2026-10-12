@@ -18,13 +18,13 @@ struct Property {
     var displayName: String {
         "\(name): \(type)"
     }
-    
+
     init(attribute: NSAttributeDescription, column: SQLiteColumn) {
         self.name = attribute.name
-        
+
         var typeString = ""
         var attributeType: SQLiteColumn.AttributeType? = nil
-        
+
         // Check if this is an external storage attribute (stores file references)
         if attribute.allowsExternalBinaryDataStorage {
             typeString = "Data"
@@ -32,7 +32,8 @@ struct Property {
         }
         // First, check if this is a UUID regardless of the declared type
         else if let className = attribute.attributeValueClassName,
-           (className == "NSUUID" || className == "UUID" || className.hasSuffix(".UUID")) {
+            className == "NSUUID" || className == "UUID" || className.hasSuffix(".UUID")
+        {
             typeString = "UUID"
             attributeType = .uuid
         } else {
@@ -78,19 +79,19 @@ struct Property {
                         typeString = className
                     }
                 }
-                
+
                 attributeType = .composite
             default:
                 typeString = "Unknown"
             }
         }
-      
+
         if attribute.isOptional {
             typeString.append("?")
         }
-        
+
         self.type = typeString
-        
+
         // Create new column with attribute type information
         self.column = SQLiteColumn(
             name: column.name,
@@ -101,29 +102,29 @@ struct Property {
             attributeType: attributeType
         )
     }
-    
+
     init(column: SQLiteColumn) {
         self.name = column.name
         self.type = column.datatype
         self.column = column
     }
-    
+
     init(relationship: NSRelationshipDescription, column: SQLiteColumn) {
         self.name = relationship.name
         self.column = column
-        
+
         // Format type based on destination entity and optionality
         var typeString = relationship.destinationEntity?.name ?? "Unknown"
         if relationship.isOptional {
             typeString.append("?")
         }
-        
+
         self.type = typeString
     }
-    
+
     init(toManyRelationship relationship: NSRelationshipDescription) {
         self.name = relationship.name
-        
+
         // For to-many relationships, we need to find the inverse relationship column
         // The inverse relationship tells us which column in the destination table points back to this entity
         let inverseColumnName: String
@@ -134,7 +135,7 @@ struct Property {
             // Fallback if no inverse relationship is defined
             inverseColumnName = "Z_PK"
         }
-        
+
         // Create a virtual column for to-many relationships
         // These don't have physical SQLite columns but need to be represented
         self.column = SQLiteColumn(
@@ -146,7 +147,7 @@ struct Property {
                 SQLiteColumn.ForeignKey(table: $0, column: inverseColumnName)
             }
         )
-        
+
         // Format type as array of destination entity
         let destinationName = relationship.destinationEntity?.name ?? "Unknown"
         self.type = "[\(destinationName)]"

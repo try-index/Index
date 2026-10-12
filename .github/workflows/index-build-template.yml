@@ -1,0 +1,53 @@
+name: Build index template
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        description: "Build using the Release configuration"
+        default: false
+
+jobs:
+  build:
+    name: Build
+    if: github.repository == 'try-index/Index'
+    timeout-minutes: 60
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: "/Applications/Xcode_26.6.app/Contents/Developer"
+      BUILD_CONFIGURATION: ${{ inputs.release && 'Release' || 'Debug' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6
+        with:
+          fetch-depth: 0
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Check formatting
+        run: |
+          swift format --recursive --configuration .swift-format -i $(find . -type f -name '*.swift' -not -path "*/.*")
+          git diff
+          if ! git diff --quiet ; then echo the following files require formatting: ; git diff --name-only ; false ; fi
+
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Index.xcodeproj \
+            -scheme Development
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Index.xcodeproj \
+            -scheme Development \
+            -configuration "${BUILD_CONFIGURATION}" \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO

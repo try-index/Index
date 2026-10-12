@@ -9,14 +9,14 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("tabBehavior") private var tabBehaviorRaw: String = TabBehavior.reuseCurrentTab.rawValue
-    
+
     private var tabBehavior: Binding<TabBehavior> {
         Binding(
             get: { TabBehavior(rawValue: tabBehaviorRaw) ?? .reuseCurrentTab },
             set: { tabBehaviorRaw = $0.rawValue }
         )
     }
-    
+
     var body: some View {
         Form {
             Section {

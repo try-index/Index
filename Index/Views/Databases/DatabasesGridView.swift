@@ -11,7 +11,7 @@ struct DatabasesGridView: View {
     @Environment(DatabasesManager.self) var databasesManager
 
     let databases: [Database]
-     
+
     @Binding var selectedDatabase: Database?
 
     let onOpen: (Database) -> Void

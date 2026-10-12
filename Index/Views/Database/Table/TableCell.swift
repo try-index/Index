@@ -19,7 +19,7 @@ class TableCell: NSTableCellView {
         guard let textField = textField as? EditableTextField else {
             return
         }
-        
+
         if backgroundStyle == .emphasized {
             // Row is selected - use white text for readability
             textField.textColor = .white

@@ -40,6 +40,7 @@
 /* Begin PBXFileReference section */
 		775C9F6D2F2A42FB00849465 /* libSQLite.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libSQLite.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		86DE4CFD25ABAAAA00AEA5A5 /* Index.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Index.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		77C0F1A12F80000000C0F1A1 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -102,6 +103,7 @@
 				77SYNC0002F2A500000000000 /* Index */,
 				775CA8422F2A4BAC00849465 /* Resources */,
 				775C9F6E2F2A42FB00849465 /* SQLite */,
+				77C0F1A22F80000000C0F1A1 /* Configuration */,
 				77443B3F2CE7249800B11F4D /* Frameworks */,
 				86DE4CFE25ABAAAA00AEA5A5 /* Products */,
 			);
@@ -114,6 +116,14 @@
 				775C9F6D2F2A42FB00849465 /* libSQLite.dylib */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		77C0F1A22F80000000C0F1A1 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				77C0F1A12F80000000C0F1A1 /* Base.xcconfig */,
+			);
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,6 +167,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 86DE4D0D25ABAAAC00AEA5A5 /* Build configuration list for PBXNativeTarget "Index" */;
 			buildPhases = (
+				77C0F1A32F80000000C0F1A1 /* ShellScript */,
 				86DE4CF925ABAAAA00AEA5A5 /* Sources */,
 				86DE4CFA25ABAAAA00AEA5A5 /* Frameworks */,
 				86DE4CFB25ABAAAA00AEA5A5 /* Resources */,
@@ -230,6 +241,27 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		77C0F1A32F80000000C0F1A1 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "swift-format lint -r ${PROJECT_DIR} --configuration .swift-format\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		775C9F6A2F2A42FB00849465 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -261,7 +293,6 @@
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = ZTW69M5NDR;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@executable_path/../Frameworks";
@@ -279,7 +310,6 @@
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = ZTW69M5NDR;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@executable_path/../Frameworks";
@@ -294,6 +324,7 @@
 		};
 		86DE4D0B25ABAAAC00AEA5A5 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 77C0F1A12F80000000C0F1A1 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -361,6 +392,7 @@
 		};
 		86DE4D0C25ABAAAC00AEA5A5 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 77C0F1A12F80000000C0F1A1 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -422,6 +454,7 @@
 		86DE4D0E25ABAAAC00AEA5A5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = Index;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
@@ -432,7 +465,6 @@
 				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Index/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
@@ -455,6 +487,7 @@
 		86DE4D0F25ABAAAC00AEA5A5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = Index;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
@@ -465,7 +498,6 @@
 				CURRENT_PROJECT_VERSION = 3;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Index/Preview Content\"";
-				DEVELOPMENT_TEAM = ZTW69M5NDR;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;

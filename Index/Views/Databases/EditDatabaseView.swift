@@ -19,7 +19,7 @@ struct EditDatabaseView: View {
         self.database = database
         self.onSave = onSave
         self.onCancel = onCancel
-        
+
         self._displayName = State(initialValue: database.name)
         self._readOnly = State(initialValue: database.readOnly)
     }

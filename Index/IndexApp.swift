@@ -11,7 +11,7 @@ import SwiftUI
 struct IndexApp: App {
     @State private var databasesManager = DatabasesManager()
     @State private var simManager = SimulatorsManager()
-    
+
     @Environment(\.openWindow) private var openWindow
 
     init() {
@@ -33,7 +33,7 @@ struct IndexApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
-        
+
         // Settings window
         Settings {
             SettingsView()
@@ -42,7 +42,8 @@ struct IndexApp: App {
         // Database windows - one per database
         WindowGroup(for: Database.ID.self) { $databaseId in
             if let databaseId = databaseId,
-               let database = databasesManager.recentDatabases.first(where: { $0.id == databaseId }) {
+                let database = databasesManager.recentDatabases.first(where: { $0.id == databaseId })
+            {
                 DatabaseView<SQLiteTable>(database: database)
                     .environment(databasesManager)
                     .environment(simManager)

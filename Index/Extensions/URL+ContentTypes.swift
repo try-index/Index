@@ -9,15 +9,12 @@ import Foundation
 import UniformTypeIdentifiers
 
 extension URL {
-    static var sqlLiteContentTypes: [UTType] { [
-        .init(filenameExtension: "db")!,
-        .init(filenameExtension: "sqlite")!,
-        .init(filenameExtension: "sqlite3")!,
-        .init(filenameExtension: "store")!
-    ]}
-    
+    static var sqlLiteContentTypes: [UTType] {
+        ["db", "sqlite", "sqlite3", "store"].compactMap { UTType(filenameExtension: $0) }
+    }
+
     func isSQLiteURL() -> Bool {
-        return URL.sqlLiteContentTypes.contains(where: {
+        URL.sqlLiteContentTypes.contains(where: {
             self.pathExtension.lowercased() == $0.preferredFilenameExtension?.lowercased()
         })
     }

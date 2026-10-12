@@ -9,6 +9,6 @@ import Foundation
 
 extension Data {
     func decodedString() -> String? {
-        return String(data: self, encoding: .utf8) ?? String(data: self, encoding: .ascii)
+        String(data: self, encoding: .utf8) ?? String(data: self, encoding: .ascii)
     }
 }

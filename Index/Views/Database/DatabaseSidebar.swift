@@ -5,25 +5,25 @@
 //  Created by Axel Martinez on 13/11/24.
 //
 
-import SwiftUI
 import SQLiteKit
+import SwiftUI
 
 struct DatabaseSidebar<T: SQLiteTable>: View {
     let client: SQLiteClient
     let displayMode: DisplayMode
-    
+
     @Binding var selection: T?
     var onOpenInNewTab: ((T) -> Void)?
-    
+
     @State private var dataObjects = [T]()
     @State private var error: SQLiteError? = nil
     @State private var showAlert = false
-    
+
     var body: some View {
         VStack {
             List(selection: $selection) {
                 switch displayMode {
-                case .SwiftData:
+                case .swiftData:
                     if let models = dataObjects as? [Model], !models.isEmpty {
                         Section(header: Text("Models")) {
                             ForEach(models, id: \.self) { model in
@@ -42,7 +42,7 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
                             }
                         }
                     }
-                case .CoreData:
+                case .coreData:
                     if let entities = dataObjects as? [Entity], !entities.isEmpty {
                         Section(header: Text("Entities")) {
                             ForEach(entities, id: \.self) { entity in
@@ -93,17 +93,17 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
             await loadData()
         }
     }
-    
+
     private func loadData() async {
         do {
             var loadedObjects = [T]()
-            
+
             switch displayMode {
-            case .SwiftData:
+            case .swiftData:
                 if let models = try await client.getModels() as? [T] {
                     loadedObjects = models
                 }
-            case .CoreData:
+            case .coreData:
                 if let entities = try await client.getEntities() as? [T] {
                     loadedObjects = entities
                 }
@@ -112,7 +112,7 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
                     loadedObjects = tables
                 }
             }
-            
+
             await MainActor.run {
                 self.dataObjects = loadedObjects
                 self.selection = loadedObjects.first
@@ -130,10 +130,10 @@ struct DatabaseSidebar<T: SQLiteTable>: View {
 
 #Preview {
     @Previewable @State var selection: SQLiteTable?
-    
+
     DatabaseSidebar<SQLiteTable>(
         client: SQLiteClient(),
-        displayMode: .SQLite,
+        displayMode: .sqlite,
         selection: $selection
     )
 }

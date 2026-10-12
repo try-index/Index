@@ -13,10 +13,10 @@ struct SimulatorsView: View {
     @Environment(SimulatorsManager.self) var simManager
 
     @Binding var sidebarVisibility: NavigationSplitViewVisibility
-    
+
     var onDatabaseOpened: (Database) -> Void
     var onClose: (() -> Void)?
-    
+
     @State private var isHomeBookmarkInvalid = false
     @State private var isFolderDialogOpen = false
     @State private var simulators = [Simulator]()
@@ -25,31 +25,31 @@ struct SimulatorsView: View {
     @State private var selectedFileInfo: FileInfo?
     @State private var openAsReadOnly = false
     @State private var openAsSQLite = false
-    
+
     var userDirectory: URL? {
         if let userDirectory = FileManager.default.urls(for: .userDirectory, in: .localDomainMask).first {
             return userDirectory.appendingPathComponent(NSUserName())
         }
-        
+
         return nil
     }
-    
+
     var groupedSimulators: [(key: String, value: [Array<Simulator>.Element])] {
         Dictionary(grouping: simulators, by: { $0.runtime }).sorted(by: { $0.key > $1.key })
     }
-    
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedSimulatorURL) {
                 HStack {
                     Spacer()
-                    
+
                     Text("Simulators")
                         .font(.title2)
-                    
+
                     Spacer()
                 }
-                
+
                 ForEach(groupedSimulators, id: \.key) { runtime, simSet in
                     Section(header: Text(runtime)) {
                         ForEach(simSet) { simulator in
@@ -123,14 +123,14 @@ struct SimulatorsView: View {
                                 options: .withSecurityScope,
                                 bookmarkDataIsStale: &isHomeBookmarkInvalid
                             )
-                            
+
                             UserDefaults.standard.set(bookmark, forKey: "homeBookmark")
-                            
+
                             self.simulators = simManager.loadSimulators(from: homeURL)
                         } catch {
                             print("Error saving home folder bookmark.")
                         }
-                        
+
                         folderPath.stopAccessingSecurityScopedResource()
                     }
                 case .failure(let error):
@@ -149,7 +149,7 @@ struct SimulatorsView: View {
                         options: .withSecurityScope,
                         bookmarkDataIsStale: &isHomeBookmarkInvalid
                     )
-                    
+
                     if let homeURL, homeURL.startAccessingSecurityScopedResource() {
                         if isHomeBookmarkInvalid {
                             self.isFolderDialogOpen.toggle()
@@ -171,7 +171,7 @@ struct SimulatorsView: View {
             }
         }
     }
-    
+
     func openFile(fileInfo: FileInfo, readOnly: Bool = false, ignoreDataModel: Bool = false) async throws {
         // Add to recent databases
         databasesManager.addDatabase(from: fileInfo.url, ignoreDataModel: ignoreDataModel)
@@ -180,7 +180,7 @@ struct SimulatorsView: View {
         if let database = databasesManager.recentDatabases.first(where: { $0.filePath == fileInfo.url.path }) {
             await MainActor.run {
                 onDatabaseOpened(database)
-                
+
                 if let onClose {
                     onClose()
                 } else {

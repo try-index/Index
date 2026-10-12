@@ -34,12 +34,14 @@ import SwiftUI
 
     private func loadData() {
         if let data = UserDefaults.standard.data(forKey: databasesKey),
-           let databases = try? JSONDecoder().decode([Database].self, from: data) {
+            let databases = try? JSONDecoder().decode([Database].self, from: data)
+        {
             self.recentDatabases = databases
         }
 
         if let data = UserDefaults.standard.data(forKey: groupsKey),
-           let groups = try? JSONDecoder().decode([DatabaseGroup].self, from: data) {
+            let groups = try? JSONDecoder().decode([DatabaseGroup].self, from: data)
+        {
             self.groups = groups
         }
     }
@@ -94,36 +96,36 @@ import SwiftUI
             saveDatabases()
         }
     }
-    
+
     func updateBookmark(for database: Database, bookmark: Data) {
         if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
             recentDatabases[index].bookmark = bookmark
             saveDatabases()
         }
     }
-    
+
     func updateDirectoryBookmark(for database: Database, bookmark: Data) {
         if let index = recentDatabases.firstIndex(where: { $0.id == database.id }) {
             recentDatabases[index].directoryBookmark = bookmark
             saveDatabases()
         }
     }
-    
+
     /// Finds an existing directory bookmark from another database in the same directory
     func findExistingDirectoryBookmark(for database: Database) -> Data? {
         let url = URL(fileURLWithPath: database.filePath)
         let parentPath = url.deletingLastPathComponent().path
-        
+
         // Look for another database in the same directory that has a directory bookmark
         for db in recentDatabases where db.id != database.id {
             let dbURL = URL(fileURLWithPath: db.filePath)
             let dbParentPath = dbURL.deletingLastPathComponent().path
-            
+
             if dbParentPath == parentPath, let bookmark = db.directoryBookmark {
                 return bookmark
             }
         }
-        
+
         return nil
     }
 
@@ -158,11 +160,13 @@ import SwiftUI
         }
 
         var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: bookmark,
-            options: .withSecurityScope,
-            bookmarkDataIsStale: &isStale
-        ) else {
+        guard
+            let url = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: .withSecurityScope,
+                bookmarkDataIsStale: &isStale
+            )
+        else {
             return nil
         }
 
@@ -213,10 +217,9 @@ import SwiftUI
     }
 
     func databases(for group: DatabaseGroup?) -> [Database] {
-        if let group = group {
-            return recentDatabases.filter { $0.groupId == group.id }
-        } else {
+        guard let group = group else {
             return recentDatabases
         }
+        return recentDatabases.filter { $0.groupId == group.id }
     }
 }

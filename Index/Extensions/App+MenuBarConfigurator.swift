@@ -5,8 +5,8 @@
 //  Created by Axel Martinez on 12/12/24.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 extension App {
     static func renameFileMenuToDatabase() {

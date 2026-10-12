@@ -1,0 +1,17 @@
+name: Build index
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  push:
+    branches:
+      - main
+      - release/*
+
+jobs:
+  index:
+    uses: ./.github/workflows/index-build-template.yml
+    secrets: inherit

@@ -14,7 +14,7 @@ struct TabItem<T: SQLiteTable>: Identifiable, Hashable {
     let sqlQuery: String?
     let filterValue: Value?
     let filterColumn: String?
-    
+
     init(table: T, title: String? = nil, sqlQuery: String? = nil, filterValue: Value? = nil, filterColumn: String? = nil) {
         self.table = table
         self.title = title ?? (table as? Entity)?.displayName ?? table.name
@@ -22,11 +22,11 @@ struct TabItem<T: SQLiteTable>: Identifiable, Hashable {
         self.filterValue = filterValue
         self.filterColumn = filterColumn
     }
-    
+
     static func == (lhs: TabItem<T>, rhs: TabItem<T>) -> Bool {
         lhs.id == rhs.id
     }
-    
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }

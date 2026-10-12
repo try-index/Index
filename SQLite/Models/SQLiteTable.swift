@@ -15,16 +15,14 @@ class SQLiteTable: Equatable, Hashable {
         self.recordCount = recordCount
         self.columns = columns
     }
-    
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(name)
         hasher.combine(columns)
         hasher.combine(recordCount)
     }
-    
+
     static func == (lhs: SQLiteTable, rhs: SQLiteTable) -> Bool {
-        lhs.name == rhs.name &&
-        lhs.columns == rhs.columns &&
-        lhs.recordCount == rhs.recordCount
+        lhs.name == rhs.name && lhs.columns == rhs.columns && lhs.recordCount == rhs.recordCount
     }
 }

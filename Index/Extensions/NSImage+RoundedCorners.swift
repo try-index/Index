@@ -20,7 +20,7 @@ extension NSImage {
         borderColor: NSColor = .clear
     ) -> NSImage {
         let imageSize = self.size
-        
+
         // Create a new image with rounded corners
         let newImage = NSImage(size: imageSize, flipped: false) { rect in
             // Create a bezier path with rounded corners
@@ -30,20 +30,20 @@ extension NSImage {
                 yRadius: cornerRadius
             )
             path.addClip()
-            
+
             // Draw the original image
             self.draw(in: rect)
-            
+
             // Add border if specified
             if borderWidth > 0 {
                 borderColor.setStroke()
                 path.lineWidth = borderWidth * 2
                 path.stroke()
             }
-            
+
             return true
         }
-        
+
         return newImage
     }
 }

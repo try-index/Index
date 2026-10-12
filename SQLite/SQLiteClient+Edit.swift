@@ -47,7 +47,8 @@ extension SQLiteClient {
     ) async throws {
         guard let value = newRecord.values[columnName] else { return }
 
-        var update = try db
+        var update =
+            try db
             .update(table.name)
             .set(columnName, to: sqlExpression(for: value))
 
@@ -103,12 +104,11 @@ extension SQLiteClient {
             return SQLLiteral.string(string)
         case .enumValue(let caseName):
             // Try to parse as integer first (for Int-backed enums)
-            if let intValue = Int(caseName) {
-                return SQLLiteral.numeric("\(intValue)")
-            } else {
+            guard let intValue = Int(caseName) else {
                 // Otherwise store as string (for String-backed enums)
                 return SQLLiteral.string(caseName)
             }
+            return SQLLiteral.numeric("\(intValue)")
         case .timestamp(let date):
             return SQLLiteral.numeric("\(date.timeIntervalSince1970)")
         case .array, .image:
@@ -133,11 +133,11 @@ extension SQLiteClient {
                 }
             }
 
-            if expressions.isEmpty {
+            guard let first = expressions.first else {
                 return nil
             }
 
-            return expressions.dropFirst().reduce(expressions.first!) { result, expr in
+            return expressions.dropFirst().reduce(first) { result, expr in
                 SQLBinaryExpression(left: result, op: SQLBinaryOperator.and, right: expr)
             }
         }

@@ -5,8 +5,8 @@
 //  Created by Axel Martinez on 13/3/25.
 //
 
-import Foundation
 import AppKit
+import Foundation
 
 public enum Value: Hashable {
     case smallint(Int16)
@@ -22,7 +22,7 @@ public enum Value: Hashable {
     case timestamp(Date)
     case null  // Explicit NULL value in database
     case undefined  // Value not present (virtual columns, relationships)
-    
+
     var isNull: Bool {
         if case .null = self { return true }
         return false
